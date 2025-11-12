@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <link rel="stylesheet" href="https://ssl.gstatic.com/docs/script/css/add-ons1.css">
+    <style>
+      .container { padding: 10px; }
+      .block { margin-bottom: 15px; }
+      label { font-weight: bold; }
+      select, button { width: 100%; }
+      #result-container { 
+        margin-top: 10px; 
+        padding: 10px; 
+        border: 1px solid #ccc; 
+        background-color: #f9f9f9; 
+        min-height: 100px;
+        max-height: 250px; /* Make the result scrollable */
+        overflow-y: auto;   /* Add scrollbar if needed */
+        font-family: monospace; 
+      }
+      #copy-container {
+        display: none; /* Hide copy button initially */
+      }
+      #spinner { display: none; margin: 10px auto; }
+      table { border-collapse: collapse; width: 100%; }
+      th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+      th { background-color: #f2f2f2; }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="block">
+        <label for="clinic-select">Selecteer een clinic:</label>
+        <select id="clinic-select">
+          <? if (clinics.length > 0) { ?>
+            <? for (var i = 0; i < clinics.length; i++) { ?>
+              <option value="<?= clinics[i] ?>"><?= clinics[i] ?></option>
+            <? } ?>
+          <? } else { ?>
+            <option disabled selected>Geen actieve clinics met deelnemers gevonden.</option>
+          <? } ?>
+        </select>
+      </div>
+
+      <div class="block">
+        <button class="action" id="generate-button" <?= clinics.length === 0 ? 'disabled' : '' ?>>Genereer lijst</button>
+      </div>
+      
+      <div id="spinner">
+        <div class="spinner"></div> <!-- Standard GAS spinner -->
+      </div>
+
+      <!-- Container for the copy button, will be shown when table is ready -->
+      <div id="copy-container" class="block">
+        <button id="copy-button">Kopieer tabel naar klembord</button>
+      </div>
+
+      <div id="result-container">
+        <!-- Result table will be injected here -->
+      </div>
+    </div>
+
+    <script>
+      document.getElementById('generate-button').addEventListener('click', generateList);
+
+      function generateList() {
+        var selectedClinic = document.getElementById('clinic-select').value;
+        if (!selectedClinic) {
+          alert('Selecteer a.u.b. een clinic.');
+          return;
+        }
+        
+        document.getElementById('spinner').style.display = 'block';
+        document.getElementById('copy-container').style.display = 'none'; // Hide button on new generation
+        document.getElementById('generate-button').disabled = true;
+        document.getElementById('result-container').innerHTML = '';
+
+        google.script.run
+          .withSuccessHandler(displayTable)
+          .withFailureHandler(onFailure)
+          .generateParticipantTable(selectedClinic);
+      }
+
+      function displayTable(htmlString) {
+        document.getElementById('spinner').style.display = 'none';
+        document.getElementById('generate-button').disabled = false;
+        document.getElementById('result-container').innerHTML = htmlString;
+        
+        const table = document.getElementById('result-container').querySelector('table');
+        if (table) {
+          document.getElementById('copy-container').style.display = 'block';
+          document.getElementById('copy-button').addEventListener('click', copyTableToClipboard);
+        }
+      }
+      
+      function onFailure(error) {
+        document.getElementById('spinner').style.display = 'none';
+        document.getElementById('generate-button').disabled = false;
+        document.getElementById('copy-container').style.display = 'none'; // Hide button on failure
+        document.getElementById('result-container').innerHTML = '<p style="color: red;">Fout: ' + error.message + '</p>';
+      }
+
+      /**
+       * Copies the table to the clipboard in two formats:
+       * 1. HTML: For pasting into rich text editors like Word or PowerPoint.
+       * 2. Plain Text (TSV): As a fallback for spreadsheets or plain text editors.
+       */
+      function copyTableToClipboard() {
+        const table = document.getElementById('result-container').querySelector('table');
+        if (!table) return;
+
+        // --- 1. Generate the Plain Text (TSV) version ---
+        let tsvContent = '';
+        const rows = table.querySelectorAll('tr');
+        rows.forEach(row => {
+          const cells = row.querySelectorAll('th, td');
+          const rowData = Array.from(cells).map(cell => cell.innerText.trim());
+          tsvContent += rowData.join('\t') + '\n';
+        });
+
+        // --- 2. Generate the HTML version ---
+        // We add some basic inline styles to ensure it looks good when pasted.
+        const htmlString = `
+          <style>
+            table { border-collapse: collapse; font-family: sans-serif; font-size: 12px; }
+            th, td { border: 1px solid #cccccc; padding: 4px 8px; }
+            th { background-color: #f2f2f2; }
+          </style>
+          ${table.outerHTML}
+        `;
+
+        const button = document.getElementById('copy-button');
+        try {
+          // --- 3. Use the Clipboard API to write both formats ---
+          const blobHtml = new Blob([htmlString], { type: 'text/html' });
+          const blobText = new Blob([tsvContent.trim()], { type: 'text/plain' });
+          const clipboardItem = new ClipboardItem({
+            'text/html': blobHtml,
+            'text/plain': blobText
+          });
+
+          navigator.clipboard.write([clipboardItem]).then(() => {
+            button.textContent = 'Gekopieerd!';
+            setTimeout(() => {
+              button.textContent = 'Kopieer tabel naar klembord';
+            }, 2000);
+          }).catch(err => {
+            console.error('Failed to copy rich text: ', err);
+            button.textContent = 'Kopiëren mislukt';
+          });
+        } catch (e) {
+          console.error('ClipboardItem API not supported or failed: ', e);
+          button.textContent = 'Kopiëren mislukt';
+        }
+      }
+    </script>
+  </body>
+</html>

@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <link rel="stylesheet" href="https://ssl.gstatic.com/docs/script/css/add-ons1.css">
+    <style>
+      .container { padding: 20px; }
+      .form-group { margin-bottom: 15px; }
+      .loader {
+        border: 4px solid #f3f3f3; border-radius: 50%; border-top: 4px solid #3498db;
+        width: 20px; height: 20px; animation: spin 2s linear infinite;
+        display: none; margin: 10px auto;
+      }
+      @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+      
+      /* --- DEFINITIVE FIX for Radio Buttons --- */
+      .input-row {
+        display: flex;
+        align-items: center;
+        margin-bottom: 8px;
+      }
+      .form-input {
+        width: 16px !important;
+        height: 16px !important;
+        margin: 0 8px 0 0 !important;
+        padding: 0 !important;
+        vertical-align: middle !important;
+        flex-shrink: 0 !important;
+      }
+      .input-row label {
+        font-weight: normal;
+        margin: 0;
+      }
+      #file-list {
+        margin-top: 15px;
+      }
+      /* --- End of FIX --- */
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="form-group">
+        <label>Selecteer het te importeren Excel-bestand</label>
+        <div id="file-list">
+          <? if (excelFiles && excelFiles.length > 0) { ?>
+            <? for (var i = 0; i < excelFiles.length; i++) { ?>
+              <div class="input-row">
+                <input type="radio" name="excel-file" id="<?= excelFiles[i].id ?>" value="<?= excelFiles[i].id ?>" class="form-input" onchange="onFileSelectionChange()">
+                <label for="<?= excelFiles[i].id ?>"><?= excelFiles[i].name ?></label>
+              </div>
+            <? } ?>
+          <? } else { ?>
+            <i>Geen Excel-bestanden gevonden in de map 'Excel-importbestanden'.</i>
+          <? } ?>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <button id="import-button" class="action" onclick="startImport()" disabled>Importeer geselecteerd bestand</button>
+      </div>
+      
+      <div id="loader" class="loader"></div>
+      <div id="status"></div>
+    </div>
+
+    <script>
+      function onFileSelectionChange() {
+        var selectedFile = document.querySelector('input[name="excel-file"]:checked');
+        document.getElementById('import-button').disabled = !selectedFile;
+      }
+
+      function startImport() {
+        var selectedFile = document.querySelector('input[name="excel-file"]:checked');
+        if (!selectedFile) {
+          document.getElementById('status').textContent = 'Selecteer a.u.b. een bestand.';
+          return;
+        }
+        
+        var fileId = selectedFile.value;
+        document.getElementById('import-button').disabled = true;
+        document.getElementById('loader').style.display = 'block';
+        document.getElementById('status').textContent = 'Bezig met verwerken... Dit kan even duren.';
+
+        google.script.run
+          .withSuccessHandler(onImportSuccess)
+          .withFailureHandler(onImportFailure)
+          .processExcelFile(fileId);
+      }
+
+      function onImportSuccess(summaryMessage) {
+        document.getElementById('loader').style.display = 'none';
+        document.getElementById('status').innerHTML = summaryMessage.replace(/\n/g, '<br>');
+        
+        var closeButton = document.createElement('button');
+        closeButton.textContent = 'Sluiten';
+        closeButton.style.marginTop = '15px';
+        closeButton.onclick = function() { google.script.host.close(); };
+        document.querySelector('.container').appendChild(closeButton);
+      }
+
+      function onImportFailure(error) {
+        document.getElementById('loader').style.display = 'none';
+        document.getElementById('status').innerHTML = '<strong>Fout:</strong> ' + error.message;
+        document.getElementById('import-button').disabled = false;
+      }
+    </script>
+  </body>
+</html>

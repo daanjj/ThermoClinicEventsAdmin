@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <link rel="stylesheet" href="https://ssl.gstatic.com/docs/script/css/add-ons1.css">
+    <style>
+      .container { padding: 20px; }
+      .form-group { margin-bottom: 15px; }
+      label { font-weight: bold; display: block; margin-bottom: 5px; }
+      select, button { width: 100%; }
+      .loader {
+        border: 4px solid #f3f3f3;
+        border-radius: 50%;
+        border-top: 4px solid #3498db;
+        width: 20px;
+        height: 20px;
+        animation: spin 2s linear infinite;
+        display: none; /* Hidden by default */
+        margin: 10px auto;
+      }
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+      
+      /* --- DEFINITIVE FIX for Radio Buttons and Checkboxes --- */
+
+      /* 1. A container to make radio buttons horizontal */
+      .horizontal-group {
+        display: flex;
+        align-items: center;
+        gap: 25px; /* Adds space between "Ja" and "Nee" */
+        margin-top: 5px;
+      }
+
+      /* 2. A shared class for any input/label pair */
+      .input-row {
+        display: flex;
+        align-items: center;
+        margin-bottom: 8px;
+      }
+
+      /* 3. The forceful override for the input elements themselves */
+      .form-input {
+        /* --- Core Fix using !important --- */
+        width: 16px !important;
+        height: 16px !important;
+        margin: 0 8px 0 0 !important; /* top, right, bottom, left */
+        padding: 0 !important;
+        vertical-align: middle !important;
+        flex-shrink: 0 !important; /* Prevents the input from being squashed */
+      }
+
+      .input-row label {
+        font-weight: normal;
+        margin: 0;
+      }
+      /* --- End of FIX --- */
+
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="form-group">
+        <label for="clinic-select">1. Selecteer de clinic</label>
+        <select id="clinic-select">
+          <? if (clinics && clinics.length > 0) { ?>
+            <option value="" disabled selected>-- Maak een keuze --</option>
+            <? for (var i = 0; i < clinics.length; i++) { ?>
+              <option value="<?= clinics[i] ?>"><?= clinics[i] ?></option>
+            <? } ?>
+          <? } else { ?>
+            <option value="" disabled>Geen clinics met deelnemers gevonden</option>
+          <? } ?>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="template-select">2. Selecteer het mailsjabloon</label>
+        <select id="template-select">
+          <? if (templates && templates.length > 0) { ?>
+            <option value="" disabled selected>-- Maak een keuze --</option>
+            <? for (var i = 0; i < templates.length; i++) { ?>
+              <option value="<?= templates[i].id ?>"><?= templates[i].name ?></option>
+            <? } ?>
+          <? } else { ?>
+            <option value="" disabled>Geen mailsjablonen gevonden</option>
+          <? } ?>
+        </select>
+      </div>
+
+      <!-- MODIFIED ATTACHMENT SECTION -->
+      <div class="form-group">
+        <label>3. Generieke bijlagen (optioneel)</label>
+        
+        <div id="attachment-prompt">
+          <p>Wil je een of meer generieke bestanden toevoegen?</p>
+          <!-- Using the horizontal-group container -->
+          <div class="horizontal-group">
+            <div class="input-row">
+                <input type="radio" id="attach-yes" name="attachment-choice" value="yes" onclick="showAttachments(true)" class="form-input">
+                <label for="attach-yes">Ja</label>
+            </div>
+            <div class="input-row">
+                <input type="radio" id="attach-no" name="attachment-choice" value="no" onclick="showAttachments(false)" checked class="form-input">
+                <label for="attach-no">Nee</label>
+            </div>
+          </div>
+        </div>
+
+        <!-- The checkbox list, now hidden by default -->
+        <div id="attachments-container" style="display: none; margin-top: 10px;">
+          <? if (genericAttachments && genericAttachments.length > 0) { ?>
+            <? for (var i = 0; i < genericAttachments.length; i++) { ?>
+              <!-- Applying the new classes for consistent styling -->
+              <div class="input-row">
+                <input type="checkbox" id="<?= genericAttachments[i].id ?>" value="<?= genericAttachments[i].id ?>" class="generic-attachment form-input">
+                <label for="<?= genericAttachments[i].id ?>"><?= genericAttachments[i].name ?></label>
+              </div>
+            <? } ?>
+          <? } else { ?>
+            <i>Geen generieke bijlagen gevonden in de map 'Algemene mailbijlagen'.</i>
+          <? } ?>
+        </div>
+      </div>
+      <!-- END OF MODIFIED SECTION -->
+
+      <div class="form-group">
+        <button id="send-button" class="action" onclick="sendEmails()">Verstuur mails</button>
+      </div>
+      
+      <div id="loader" class="loader"></div>
+      <div id="status"></div>
+    </div>
+
+    <script>
+      /**
+       * Shows or hides the attachment selection based on user choice.
+       */
+      function showAttachments(shouldShow) {
+        var containerDiv = document.getElementById('attachments-container');
+        if (shouldShow) {
+          containerDiv.style.display = 'block';
+        } else {
+          containerDiv.style.display = 'none';
+          // Also uncheck all boxes if user selects "Nee"
+          var checkboxes = containerDiv.querySelectorAll('.generic-attachment:checked');
+          checkboxes.forEach(function(checkbox) {
+            checkbox.checked = false;
+          });
+        }
+      }
+
+      function sendEmails() {
+        var sendButton = document.getElementById('send-button');
+        var loader = document.getElementById('loader');
+        var statusDiv = document.getElementById('status');
+        
+        var clinicSelect = document.getElementById('clinic-select');
+        var templateSelect = document.getElementById('template-select');
+        
+        var selectedClinic = clinicSelect.value;
+        var selectedTemplateId = templateSelect.value;
+        var selectedTemplateName = templateSelect.options[templateSelect.selectedIndex].text;
+        
+        var selectedAttachments = [];
+        var checkboxes = document.querySelectorAll('.generic-attachment:checked');
+        checkboxes.forEach(function(checkbox) {
+          selectedAttachments.push(checkbox.value);
+        });
+
+        if (!selectedClinic || !selectedTemplateId) {
+          statusDiv.textContent = 'Selecteer a.u.b. een clinic en een sjabloon.';
+          return;
+        }
+
+        sendButton.disabled = true;
+        loader.style.display = 'block';
+        statusDiv.textContent = 'Bezig met versturen... Dit kan even duren.';
+
+        google.script.run
+          .withSuccessHandler(onSuccess)
+          .withFailureHandler(onFailure)
+          .performMailMerge(selectedClinic, selectedTemplateId, selectedTemplateName, selectedAttachments);
+      }
+
+      function onSuccess(message) {
+        google.script.host.close();
+      }
+
+      function onFailure(error) {
+        var sendButton = document.getElementById('send-button');
+        var loader = document.getElementById('loader');
+        var statusDiv = document.getElementById('status');
+        
+        sendButton.disabled = false;
+        loader.style.display = 'none';
+        statusDiv.innerHTML = '<strong>Fout:</strong> ' + error.message;
+      }
+    </script>
+  </body>
+</html>
