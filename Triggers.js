@@ -23,10 +23,10 @@ function masterOnEdit(e) {
 
     switch (sheetName) {
       case DATA_CLINICS_SHEET_NAME:
-        Logger.log(`Routing to handleTimeChange(), updateAllFormDropdowns(), and syncCalendarEventFromSheet().`);
+        Logger.log(`Routing to handleTimeChange(), syncCalendarEventFromSheet(), and updateAllFormDropdowns().`);
         handleTimeChange(e); // Handle time changes and folder renames first
+        syncCalendarEventFromSheet(e.range.getRow()); // Sync calendar for any edit (including max seats changes)
         updateAllFormDropdowns();
-        syncCalendarEventFromSheet(e.range.getRow());
         break;
       case CORE_APP_SHEET_NAME:
         Logger.log(`Routing to processCoreAppManualEdit().`);

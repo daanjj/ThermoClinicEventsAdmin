@@ -134,13 +134,66 @@ function syncCalendarEventFromSheet(rowNum) {
       return;
     }
   }
+  
+  // Try to find max seats column by checking the correct header name
+  let maxSeatsColIdx = -1;
+  const possibleMaxSeatsHeaders = ['Maximum aantal deelnemers', 'Maximum aantal', 'Max seats', 'Maximaal aantal', 'Maximum', 'Max'];
+  for (const headerName of possibleMaxSeatsHeaders) {
+    if (headerMap[headerName] !== undefined) {
+      maxSeatsColIdx = headerMap[headerName];
+      break;
+    }
+  }
+  
+  // Fallback to hardcoded column index if header not found
+  if (maxSeatsColIdx === -1) {
+    maxSeatsColIdx = MAX_SEATS_COLUMN_INDEX - 1; // Convert to 0-based index
+    Logger.log(`Warning: Max seats header not found in headerMap, using fallback column index ${MAX_SEATS_COLUMN_INDEX}`);
+  }
+  
   const dateValue = rowData[headerMap['Datum']];
   const timeValue = rowData[headerMap['Tijdstip']];
   const location = rowData[headerMap['Locatie']];
   const bookedSeatsRaw = rowData[headerMap['Aantal boekingen']];
+  const maxSeatsRaw = rowData[maxSeatsColIdx]; // Get max seats using determined column index
   const eventId = rowData[headerMap[CALENDAR_EVENT_ID_HEADER]];
 
   const bookedSeats = parseInt(bookedSeatsRaw, 10) || 0;
+  const maxSeats = parseInt(maxSeatsRaw, 10) || 0;
+  
+  // Debug logging
+  Logger.log(`syncCalendarEventFromSheet row ${rowNum}: maxSeatsRaw="${maxSeatsRaw}", maxSeats=${maxSeats}, bookedSeats=${bookedSeats}`);
+  Logger.log(`syncCalendarEventFromSheet row ${rowNum}: maxSeatsColIdx=${maxSeatsColIdx}, eventId="${eventId}"`);
+  logMessage(`DEBUG: Sync calendar voor rij ${rowNum} - Max seats: ${maxSeats}, Booked seats: ${bookedSeats}, Event ID: ${eventId || 'geen'}`);
+  
+  // Check if max seats is 0 - if so, delete the calendar event
+  if (maxSeats === 0) {
+    logMessage(`Max seats = 0 gedetecteerd voor rij ${rowNum}. Verwijderen van agenda-item...`);
+    Logger.log(`Max seats = 0 detected for row ${rowNum}, attempting to delete calendar event`);
+    if (eventId) {
+      try {
+        const calendar = CalendarApp.getCalendarById(TARGET_CALENDAR_ID);
+        if (calendar) {
+          const event = calendar.getEventById(eventId);
+          if (event) {
+            event.deleteEvent();
+            // Clear the calendar event ID from the sheet
+            sheet.getRange(rowNum, headerMap[CALENDAR_EVENT_ID_HEADER] + 1).setValue('');
+            logMessage(`Agenda-item verwijderd voor event op rij ${rowNum} (max seats = 0). Locatie: "${location}".`);
+            Logger.log(`Deleted calendar event for row ${rowNum} due to max seats = 0.`);
+          }
+        }
+      } catch (e) {
+        logMessage(`WAARSCHUWING: Kon agenda-item niet verwijderen voor rij ${rowNum}: ${e.message}`);
+        Logger.log(`Could not delete calendar event for row ${rowNum}. Error: ${e.toString()}`);
+      }
+    } else {
+      logMessage(`Max seats = 0 voor rij ${rowNum}, maar geen bestaand agenda-item gevonden om te verwijderen.`);
+      Logger.log(`Max seats = 0 for row ${rowNum}, but no existing calendar event ID found to delete.`);
+    }
+    return; // Exit early, no need to create/update event when max seats is 0
+  }
+  
   if (!dateValue || !location) return;
   let titleSuffix = !bookedSeats ? `${location} (OPTIE - nog geen deelnemers)` : `${location} (${bookedSeats} ${bookedSeats === 1 ? 'deelnemer' : 'deelnemers'})`;
   const title = `Thermoclinic op/bij ${titleSuffix}`;

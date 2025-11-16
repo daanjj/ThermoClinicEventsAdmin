@@ -48,6 +48,7 @@ function processBooking(e) {
     const headers = allData.shift();
     const eventFolderIdColIdx = headers.indexOf(EVENT_FOLDER_ID_HEADER);
 
+    let clinicType = '';
     for (let i = 0; i < allData.length; i++) {
       const rowData = allData[i];
       const sheetDateValue = rowData[DATE_COLUMN_INDEX - 1];
@@ -57,6 +58,7 @@ function processBooking(e) {
       
       if (reconstructedOption === selectedEventOption) {
         foundRowIndex = i + DATA_CLINICS_START_ROW;
+        clinicType = String(rowData[TYPE_COLUMN_INDEX - 1] || '').trim().toLowerCase();
         const currentBookedSeats = (rowData[BOOKED_SEATS_COLUMN_INDEX - 1] || 0);
         const newBookedSeats = currentBookedSeats + 1;
         dataClinicsSheet.getRange(foundRowIndex, BOOKED_SEATS_COLUMN_INDEX).setValue(newBookedSeats);
@@ -95,17 +97,31 @@ function processBooking(e) {
     if (pNumCol !== -1) targetSheet.getRange(targetRow, pNumCol + 1).setValue(participantSequenceNumber);
     if (fIdCol !== -1) targetSheet.getRange(targetRow, fIdCol + 1).setValue(participantSubfolderId);
 
-    // Send confirmation email
+    // Send confirmation email with appropriate template based on clinic type
     if (placeholderMap['<Email>']) {
-      // ===== CHANGE IS HERE =====
-      // Replaced mergeTemplateInDoc with the new robust helper function
-      const mergedMail = mergeSingleTemplate(CONFIRMATION_EMAIL_TEMPLATE_ID, placeholderMap);
-      // ==========================
+      // Determine which template to use based on clinic type
+      let templateId;
+      let templateType;
+      
+      if (clinicType === 'open') {
+        templateId = OPEN_CONFIRMATION_EMAIL_TEMPLATE_ID;
+        templateType = 'Open';
+      } else if (clinicType === 'besloten') {
+        templateId = BESLOTEN_CONFIRMATION_EMAIL_TEMPLATE_ID;
+        templateType = 'Besloten';
+      } else {
+        // Fallback to original template if type is not recognized
+        templateId = CONFIRMATION_EMAIL_TEMPLATE_ID;
+        templateType = 'Default';
+        logMessage(`WAARSCHUWING: Onbekend clinic type '${clinicType}'. Gebruik standaard template.`);
+      }
+      
+      const mergedMail = mergeSingleTemplate(templateId, placeholderMap);
       
       GmailApp.sendEmail(placeholderMap['<Email>'], mergedMail.subject, '', { name: mergedMail.senderName, htmlBody: mergedMail.htmlBody, from: fromAlias });
       
-      const templateName = DriveApp.getFileById(CONFIRMATION_EMAIL_TEMPLATE_ID).getName();
-      logMessage(`Registratiebevestiging verstuurd aan: ${placeholderMap['<Email>']}, Onderwerp: "${mergedMail.subject}"`);
+      const templateName = DriveApp.getFileById(templateId).getName();
+      logMessage(`${templateType} registratiebevestiging verstuurd aan: ${placeholderMap['<Email>']}, Onderwerp: "${mergedMail.subject}"`);
     } else {
         logMessage(`WAARSCHUWING: Geen e-mailadres. Bevestigingsmail niet verstuurd.`);
     }

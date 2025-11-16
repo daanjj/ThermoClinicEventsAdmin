@@ -88,37 +88,71 @@ function archiveOldClinics(isManualTrigger) {
         logMessage(`Alle clinics zijn gearchiveerd uit '${DATA_CLINICS_SHEET_NAME}'.`);
     }
 
-    // Clean up participant response sheets
+    // Archive participant response data instead of deleting it
     const responseSs = SpreadsheetApp.getActiveSpreadsheet();
+    
+    // Create participant archive sheet if it doesn't exist
+    let participantArchiveSheet = responseSs.getSheetByName(ARCHIVE_PARTICIPANTS_SHEET_NAME);
+    if (!participantArchiveSheet) {
+      participantArchiveSheet = responseSs.insertSheet(ARCHIVE_PARTICIPANTS_SHEET_NAME);
+      logMessage(`Deelnemers archief sheet '${ARCHIVE_PARTICIPANTS_SHEET_NAME}' aangemaakt.`);
+    }
+    
     [OPEN_FORM_RESPONSE_SHEET_NAME, BESLOTEN_FORM_RESPONSE_SHEET_NAME].forEach(sheetName => {
       const responseSheet = responseSs.getSheetByName(sheetName);
       if (!responseSheet) {
-        logMessage(`WAARSCHUWING: Respons-sheet '${sheetName}' niet gevonden voor opschonen.`);
+        logMessage(`WAARSCHUWING: Respons-sheet '${sheetName}' niet gevonden voor archivering.`);
         return;
       }
       
       const responseData = responseSheet.getDataRange().getValues();
       if (responseData.length < 2) return; // Only headers
       
-      const responseHeaders = responseData.shift();
+      const responseHeaders = responseData[0];
       const eventColIdx = responseHeaders.indexOf(FORM_EVENT_QUESTION_TITLE);
       
       if (eventColIdx === -1) {
-        logMessage(`WAARSCHUWING: Kolom '${FORM_EVENT_QUESTION_TITLE}' ontbreekt in respons-sheet '${sheetName}'. Kan deze sheet niet opschonen.`);
+        logMessage(`WAARSCHUWING: Kolom '${FORM_EVENT_QUESTION_TITLE}' ontbreekt in respons-sheet '${sheetName}'. Kan deze sheet niet archiveren.`);
         return;
       }
       
-      const responsesToKeep = responseData.filter(row => {
-          const participantClinicName = (row[eventColIdx] || '').replace(/\s\(.*\)$/, '').trim();
-          return !archivedClinicNames.has(participantClinicName);
-      });
-
-      // Clear existing responses and write back the ones to keep
-      responseSheet.getRange(2, 1, responseSheet.getLastRow(), responseSheet.getLastColumn()).clearContent();
-      if (responsesToKeep.length > 0) {
-        responseSheet.getRange(2, 1, responsesToKeep.length, responsesToKeep[0].length).setValues(responsesToKeep);
+      // Set up participant archive sheet headers if empty
+      if (participantArchiveSheet.getLastRow() === 0) {
+        // Add source sheet column and original headers
+        const archiveHeaders = ['Bron Sheet'].concat(responseHeaders);
+        participantArchiveSheet.getRange(1, 1, 1, archiveHeaders.length).setValues([archiveHeaders]);
       }
-      logMessage(`${responseData.length - responsesToKeep.length} reacties verwijderd uit '${sheetName}'.`);
+      
+      const participantsToArchive = [];
+      const rowsToStrikeThrough = [];
+      
+      // Find participants from archived clinics
+      for (let i = 1; i < responseData.length; i++) {
+        const row = responseData[i];
+        const participantClinicName = (row[eventColIdx] || '').replace(/\s\(.*\)$/, '').trim();
+        
+        if (archivedClinicNames.has(participantClinicName)) {
+          // Add source sheet info and participant data for archiving
+          const archiveRow = [sheetName].concat(row);
+          participantsToArchive.push(archiveRow);
+          rowsToStrikeThrough.push(i + 1); // +1 because sheet rows are 1-indexed
+        }
+      }
+      
+      // Archive participants to the archive sheet
+      if (participantsToArchive.length > 0) {
+        const startRow = participantArchiveSheet.getLastRow() + 1;
+        participantArchiveSheet.getRange(startRow, 1, participantsToArchive.length, participantsToArchive[0].length)
+          .setValues(participantsToArchive);
+        
+        // Apply strike-through formatting to original rows
+        rowsToStrikeThrough.forEach(rowNum => {
+          const range = responseSheet.getRange(rowNum, 1, 1, responseSheet.getLastColumn());
+          range.setFontLine('line-through');
+        });
+        
+        logMessage(`${participantsToArchive.length} deelnemers van gearchiveerde clinics verplaatst naar '${ARCHIVE_PARTICIPANTS_SHEET_NAME}' en doorgestreept in '${sheetName}'.`);
+      }
     });
 
     const plural = numArchived === 1 ? 'clinic' : 'clinics';
