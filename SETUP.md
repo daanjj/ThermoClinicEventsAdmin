@@ -53,8 +53,14 @@
    * runManualArchive()  
    * runDailyArchive()  
    * archiveOldClinics(isManualTrigger)  
-   * **Why:** Dedicated to the archiving process, which can be run manually or via a daily trigger.  
-10. **ParticipantLists.js**  
+   * **Why:** Dedicated to the archiving process, which can be run manually or via a daily trigger. Now preserves participant data instead of deleting it.  
+10. **VersionHistoryRecovery.js**  
+    * recoverAllParticipantsToCSV()  
+    * recoverParticipantsStepwise()  
+    * showVersionHistoryInstructions()  
+    * Various batch processing and recovery functions  
+    * **Why:** Comprehensive system for recovering participant data from spreadsheet version history and archives. Essential for data recovery scenarios.  
+11. **ParticipantLists.js**  
     * showParticipantListDialog()  
     * getClinicsForParticipantList()  
     * generateParticipantTable(selectedClinic)  

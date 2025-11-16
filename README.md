@@ -11,13 +11,14 @@ The system is built around a central Google Sheet that acts as a database for al
 *   **Automated Registration Processing**: New sign-ups via Google Forms automatically update available slots in the main events sheet.
 *   **Dynamic Form Updates**: Google Form dropdowns for clinic selection are automatically populated and updated based on the events listed in the Google Sheet, ensuring participants can only sign up for active events.
 *   **Calendar Synchronization**: Automatically creates and updates Google Calendar events based on the data in the sheet, including participant counts in the event description.
-*   **Personalized Mail Merge**: A powerful, built-in mail merge feature allows for sending customized bulk emails to participants of a specific clinic. It supports HTML templates, placeholders (like `<Voornaam>`), and attachments.
+*   **Personalized Mail Merge**: A powerful, built-in mail merge feature allows for sending customized bulk emails to participants of a specific clinic. It supports HTML templates, placeholders (like `<Voornaam>`), and attachments. Includes separate confirmation email templates for Open and Besloten clinics.
 *   **CORE App Integration**: Specific functionality to manage communication with participants regarding the CORE Body Temperature Sensor app, including sending reminders to those who haven't registered their app email.
 *   **Participant Data Management**:
     *   Creates a unique Google Drive folder for each event and a subfolder for each participant upon registration.
     *   Imports participant data from Excel files, automatically creating folders and adding them to the appropriate response sheet.
     *   Generates on-demand participant lists with key information in a convenient dialog.
-*   **Automated Archiving**: A daily, time-driven trigger automatically archives past events and their corresponding participant responses to keep the active sheets clean and performant.
+*   **Automated Archiving**: A daily, time-driven trigger automatically archives past events and their corresponding participant responses to keep the active sheets clean and performant. Archived participant data is preserved rather than deleted.
+*   **Version History Recovery**: Comprehensive data recovery system that can extract participant information from spreadsheet version history, with support for batch processing and CSV export.
 *   **Robust Logging**: All major actions, errors, and communications are logged to a central Google Document for easy monitoring and debugging.
 
 ## How It Works
@@ -27,10 +28,11 @@ The system is built around a central Google Sheet that acts as a database for al
 3.  **Trigger Execution**: An `onFormSubmit` trigger fires the `processBooking` function.
 4.  **Processing**: The script:
     *   Finds the corresponding clinic in the `Data clinics` sheet.
+    *   Determines the clinic type (Open or Besloten).
     *   Increments the 'Booked Seats' count.
     *   Creates an event folder and a unique participant subfolder in Google Drive.
     *   Writes the new participant's data to the correct response sheet (e.g., `Open Form Responses`).
-    *   Sends a personalized confirmation email using a template.
+    *   Sends a personalized confirmation email using the appropriate template (separate templates for Open vs Besloten clinics).
     *   Updates the Google Calendar event.
     *   Refreshes the dropdowns on all Google Forms to reflect the new seat availability.
 
@@ -46,7 +48,8 @@ The script is organized into logical modules for maintainability and clarity:
 *   `EventsAndForms.js`: Manages the synchronization of data between the Google Sheet, Google Calendar, and Google Forms dropdowns.
 *   `ParticipantLists.js`: Powers the feature for generating participant list reports.
 *   `ExcelImport.js`: A self-contained feature for importing participant data from Excel files.
-*   `Archiving.js`: Dedicated to the automated archiving process for old clinics.
+*   `Archiving.js`: Dedicated to the automated archiving process for old clinics with participant data preservation.
+*   `VersionHistoryRecovery.js`: Comprehensive system for recovering participant data from spreadsheet version history and archives.
 *   `Utils.js`: Contains generic helper functions (like logging, date formatting, and authorization) used across the entire project.
 *   `*.html`: HTML files that define the user interface for custom dialogs (e.g., Mail Merge, Participant Lists).
 
