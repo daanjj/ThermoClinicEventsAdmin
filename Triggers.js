@@ -23,14 +23,19 @@ function masterOnEdit(e) {
 
     switch (sheetName) {
       case DATA_CLINICS_SHEET_NAME:
-        Logger.log(`Routing to handleTimeChange(), syncCalendarEventFromSheet(), and updateAllFormDropdowns().`);
-        handleTimeChange(e); // Handle time changes and folder renames first
+        Logger.log(`Routing to handleEventChange(), syncCalendarEventFromSheet(), and updateAllFormDropdowns().`);
+        handleEventChange(e); // Handle date, time, and location changes with folder renames
         syncCalendarEventFromSheet(e.range.getRow()); // Sync calendar for any edit (including max seats changes)
         updateAllFormDropdowns();
         break;
       case CORE_APP_SHEET_NAME:
         Logger.log(`Routing to processCoreAppManualEdit().`);
         processCoreAppManualEdit(e);
+        break;
+      case OPEN_FORM_RESPONSE_SHEET_NAME:
+      case BESLOTEN_FORM_RESPONSE_SHEET_NAME:
+        Logger.log(`Routing to handleParticipantNameChange().`);
+        handleParticipantNameChange(e);
         break;
     }
   } catch (err) {

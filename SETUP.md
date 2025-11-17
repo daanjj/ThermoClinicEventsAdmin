@@ -18,7 +18,7 @@
    * forceAuthorization() (This is a manual utility but fits well with general script health checks)  
    * **Why:** Generic helper functions that are used across various parts of your script. These are foundational.  
 4. **EventsAndForms.js**  
-   * handleTimeChange(e)  
+   * handleEventChange(e)  
    * syncCalendarEventFromSheet(rowNum)  
    * updateEventFolderIDs() (Another manual utility, but directly related to event folders)  
    * populateFormDropdown(formType)  

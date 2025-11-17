@@ -2,11 +2,11 @@
 // and populating form dropdowns based on clinic data.
 
 /**
- * Triggered on an edit in 'Data clinics'. If the 'Tijdstip' column is changed,
+ * Triggered on an edit in 'Data clinics'. If the date, time, or location column is changed,
  * this function updates corresponding entries in response sheets AND renames the event folder in Drive.
  * @param {Object} e The event object from the onEdit trigger.
  */
-function handleTimeChange(e) {
+function handleEventChange(e) {
   // --- Step 1: Validate the edit ---
   if (!e || !e.range || !e.oldValue || !e.value || e.oldValue === e.value) {
     return; // Not a relevant value change
@@ -22,12 +22,16 @@ function handleTimeChange(e) {
     return; // Ignore header edits
   }
   
-  // Check if the edited column is 'Tijdstip'
-  if (e.range.getColumn() !== TIME_COLUMN_INDEX) {
-    return;
+  const editedColumn = e.range.getColumn();
+  
+  // Check if the edited column is date, time, or location
+  if (editedColumn !== DATE_COLUMN_INDEX && editedColumn !== TIME_COLUMN_INDEX && editedColumn !== LOCATION_COLUMN_INDEX) {
+    return; // Not a relevant column
   }
   
-  logMessage(`Tijdstip wijziging gedetecteerd in '${DATA_CLINICS_SHEET_NAME}' op rij ${editedRow}. Oud: "${e.oldValue}", Nieuw: "${e.value}".`);
+  const columnNames = ['Datum', 'Tijdstip', 'Locatie'];
+  const columnName = columnNames[editedColumn - 1] || 'Onbekend';
+  logMessage(`${columnName} wijziging gedetecteerd in '${DATA_CLINICS_SHEET_NAME}' op rij ${editedRow}. Oud: "${e.oldValue}", Nieuw: "${e.value}".`);
 
   // --- Step 2: Read row data and construct event names ---
   const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
@@ -35,22 +39,30 @@ function handleTimeChange(e) {
   
   const rowData = sheet.getRange(editedRow, 1, 1, sheet.getLastColumn()).getValues()[0];
   const dateValue = rowData[DATE_COLUMN_INDEX - 1];
+  const timeValue = rowData[TIME_COLUMN_INDEX - 1];
   const locationValue = rowData[LOCATION_COLUMN_INDEX - 1];
   const eventFolderId = (eventFolderIdColIdx !== -1) ? rowData[eventFolderIdColIdx] : null;
 
-  if (!dateValue || !locationValue) {
-    logMessage(`FOUT: Kan event niet identificeren. Datum of locatie ontbreekt op rij ${editedRow}.`);
+  if (!dateValue || !timeValue || !locationValue) {
+    logMessage(`FOUT: Kan event niet identificeren. Datum, tijd of locatie ontbreekt op rij ${editedRow}.`);
     return;
   }
 
   // --- Step 3: Rename the Google Drive Folder ---
   if (eventFolderId) {
     try {
-      const newTimeFormatted = String(e.value).trim().replace(/:|\./g, '');
-      const newFolderName = `${Utilities.formatDate(new Date(dateValue), FORMATTING_TIME_ZONE, DATE_FORMAT_YYYYMMDD)} ${newTimeFormatted} ${locationValue}`;
+      const dateFormatted = Utilities.formatDate(new Date(dateValue), FORMATTING_TIME_ZONE, DATE_FORMAT_YYYYMMDD);
+      const timeFormatted = String(timeValue).trim().replace(/:|\./g, '');
+      const newFolderName = `${dateFormatted} ${timeFormatted} ${locationValue}`;
       const folder = DriveApp.getFolderById(eventFolderId);
-      folder.setName(newFolderName);
-      logMessage(`Event folder hernoemd naar: "${newFolderName}".`);
+      const currentFolderName = folder.getName();
+      
+      if (currentFolderName !== newFolderName) {
+        folder.setName(newFolderName);
+        logMessage(`Event folder hernoemd van "${currentFolderName}" naar "${newFolderName}".`);
+      } else {
+        logMessage(`Event folder naam is al correct: "${newFolderName}".`);
+      }
     } catch (driveError) {
       logMessage(`WAARSCHUWING: Kon de event folder met ID "${eventFolderId}" niet hernoemen. Fout: ${driveError.message}`);
       Logger.log(`Could not rename folder with ID ${eventFolderId}. Error: ${driveError.toString()}`);
@@ -61,8 +73,21 @@ function handleTimeChange(e) {
 
   // --- Step 4: Update participant entries in response sheets ---
   const dateString = getDutchDateString(new Date(dateValue));
-  const oldEventNameBase = `${dateString} ${String(e.oldValue).trim()}, ${String(locationValue).trim()}`;
-  const newEventNameBase = `${dateString} ${String(e.value).trim()}, ${String(locationValue).trim()}`;
+  
+  // Construct old and new event names based on which column was changed
+  let oldEventNameBase, newEventNameBase;
+  
+  if (editedColumn === DATE_COLUMN_INDEX) {
+    const oldDateString = getDutchDateString(new Date(e.oldValue));
+    oldEventNameBase = `${oldDateString} ${String(timeValue).trim()}, ${String(locationValue).trim()}`;
+    newEventNameBase = `${dateString} ${String(timeValue).trim()}, ${String(locationValue).trim()}`;
+  } else if (editedColumn === TIME_COLUMN_INDEX) {
+    oldEventNameBase = `${dateString} ${String(e.oldValue).trim()}, ${String(locationValue).trim()}`;
+    newEventNameBase = `${dateString} ${String(timeValue).trim()}, ${String(locationValue).trim()}`;
+  } else if (editedColumn === LOCATION_COLUMN_INDEX) {
+    oldEventNameBase = `${dateString} ${String(timeValue).trim()}, ${String(e.oldValue).trim()}`;
+    newEventNameBase = `${dateString} ${String(timeValue).trim()}, ${String(locationValue).trim()}`;
+  }
   
   logMessage(`Zoeken naar deelnemers voor event: "${oldEventNameBase}" om bij te werken naar "${newEventNameBase}".`);
 
@@ -349,5 +374,186 @@ function populateFormDropdown(formType) {
   } catch (err) {
     Logger.log(`populate... ERROR for form type ${formType}: ${err.toString()}`);
     logMessage(`FOUT bij bijwerken dropdown voor formulier type ${formType}: ${err.message}`);
+  }
+}
+
+/**
+ * Handles participant name changes in response sheets by renaming their corresponding folders.
+ * This function is triggered when someone directly edits first name or last name columns in the response sheets.
+ * @param {Object} e The edit event object from the onEdit trigger.
+ */
+function handleParticipantNameChange(e) {
+  try {
+    const sheet = e.range.getSheet();
+    const editedRow = e.range.getRow();
+    const editedCol = e.range.getColumn();
+    
+    // Get headers to identify which column was edited
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    const editedHeader = headers[editedCol - 1];
+    
+    // Only proceed if a name column was edited
+    if (editedHeader !== FORM_FIRST_NAME_QUESTION_TITLE && editedHeader !== FORM_LAST_NAME_QUESTION_TITLE) {
+      return; // Not a name change, exit early
+    }
+    
+    logMessage(`Deelnemernaam gewijzigd in rij ${editedRow}, kolom '${editedHeader}'.`);
+    
+    // Get column indices
+    const firstNameColIdx = headers.indexOf(FORM_FIRST_NAME_QUESTION_TITLE);
+    const lastNameColIdx = headers.indexOf(FORM_LAST_NAME_QUESTION_TITLE);
+    const participantNumberColIdx = headers.indexOf(DEELNEMERNUMMER_HEADER);
+    const folderIdColIdx = headers.indexOf(DRIVE_FOLDER_ID_HEADER);
+    
+    // Validate required columns exist
+    if (participantNumberColIdx === -1 || folderIdColIdx === -1) {
+      logMessage(`FOUT: Benodigde kolommen ontbreken. ${DEELNEMERNUMMER_HEADER}: ${participantNumberColIdx}, ${DRIVE_FOLDER_ID_HEADER}: ${folderIdColIdx}`);
+      return;
+    }
+    
+    // Get participant data from the edited row
+    const rowData = sheet.getRange(editedRow, 1, 1, sheet.getLastColumn()).getValues()[0];
+    const firstName = firstNameColIdx !== -1 ? String(rowData[firstNameColIdx] || '').trim() : '';
+    const lastName = lastNameColIdx !== -1 ? String(rowData[lastNameColIdx] || '').trim() : '';
+    const participantNumber = String(rowData[participantNumberColIdx] || '').trim();
+    const folderId = String(rowData[folderIdColIdx] || '').trim();
+    
+    if (!participantNumber) {
+      logMessage(`FOUT: Geen deelnemernummer gevonden in rij ${editedRow}.`);
+      return;
+    }
+    
+    // Format participant number to always have 2 digits (e.g., "7" becomes "07")
+    const formattedParticipantNumber = Utilities.formatString('%02d', parseInt(participantNumber) || 0);
+    
+    // Create new folder name
+    let newFolderName;
+    if (!firstName && !lastName) {
+      newFolderName = `${formattedParticipantNumber} ${DEFAULT_UNASSIGNED_PARTICIPANT_NAME}`;
+    } else {
+      newFolderName = `${formattedParticipantNumber} ${firstName} ${lastName}`.replace(/\s+/g, ' ').trim();
+    }
+    
+    // Validate folder name length (Google Drive limit is 255 characters)
+    if (newFolderName.length > 255) {
+      // Truncate last name to fit within limit
+      const maxLastNameLength = 255 - participantNumber.length - firstName.length - 3; // 3 for spaces
+      const truncatedLastName = lastName.substring(0, Math.max(0, maxLastNameLength));
+      newFolderName = `${participantNumber} ${firstName} ${truncatedLastName}`.replace(/\s+/g, ' ').trim();
+      logMessage(`WAARSCHUWING: Mapnaam ingekort tot ${newFolderName.length} karakters: "${newFolderName}"`);
+    }
+    
+    // Handle folder operations
+    if (folderId) {
+      // Try to rename existing folder
+      try {
+        const folder = DriveApp.getFolderById(folderId);
+        const currentName = folder.getName();
+        
+        if (currentName === newFolderName) {
+          logMessage(`Info: Mapnaam is al correct: "${newFolderName}". Geen actie nodig.`);
+          return;
+        }
+        
+        // Check for duplicate names in the same parent folder
+        const parentFolders = folder.getParents();
+        if (parentFolders.hasNext()) {
+          const parentFolder = parentFolders.next();
+          const existingFolders = parentFolder.getFoldersByName(newFolderName);
+          
+          if (existingFolders.hasNext()) {
+            // Handle duplicate by appending number
+            let counter = 2;
+            let uniqueName = `${newFolderName} (${counter})`;
+            
+            while (parentFolder.getFoldersByName(uniqueName).hasNext()) {
+              counter++;
+              uniqueName = `${newFolderName} (${counter})`;
+              if (counter > 100) break; // Safety limit
+            }
+            
+            newFolderName = uniqueName;
+            logMessage(`WAARSCHUWING: Duplicate mapnaam gevonden. Hernoemd naar: "${newFolderName}"`);
+          }
+        }
+        
+        folder.setName(newFolderName);
+        logMessage(`Deelnemersmap hernoemd van "${currentName}" naar "${newFolderName}".`);
+        
+      } catch (folderError) {
+        // Folder no longer exists, create new one
+        logMessage(`WAARSCHUWING: Bestaande map (ID: ${folderId}) niet gevonden. Nieuwe map wordt aangemaakt.`);
+        
+        // Find the event folder to create the new participant folder in
+        const eventNameCol = headers.indexOf(FORM_EVENT_QUESTION_TITLE);
+        if (eventNameCol !== -1) {
+          const eventName = String(rowData[eventNameCol] || '').replace(/\s\(.*\)$/, '').trim();
+          
+          try {
+            // Find event folder ID from Data Clinics sheet
+            const dataClinicsSpreadsheet = SpreadsheetApp.openById(DATA_CLINICS_SPREADSHEET_ID);
+            const dataClinicsSheet = dataClinicsSpreadsheet.getSheetByName(DATA_CLINICS_SHEET_NAME);
+            const dataClinicsData = dataClinicsSheet.getDataRange().getValues();
+            const dataClinicsHeaders = dataClinicsData.shift();
+            const eventFolderIdColIdx = dataClinicsHeaders.indexOf(EVENT_FOLDER_ID_HEADER);
+            
+            let eventFolderId = null;
+            for (const row of dataClinicsData) {
+              const dateValue = row[DATE_COLUMN_INDEX - 1];
+              if (!dateValue) continue;
+              
+              const reconstructedName = `${getDutchDateString(new Date(dateValue))} ${String(row[TIME_COLUMN_INDEX - 1] || '').trim()}, ${String(row[LOCATION_COLUMN_INDEX - 1] || '').trim()}`;
+              if (reconstructedName === eventName && eventFolderIdColIdx !== -1) {
+                eventFolderId = row[eventFolderIdColIdx];
+                break;
+              }
+            }
+            
+            if (eventFolderId) {
+              const eventFolder = DriveApp.getFolderById(eventFolderId);
+              
+              // Check for duplicate names and handle
+              const existingFolders = eventFolder.getFoldersByName(newFolderName);
+              if (existingFolders.hasNext()) {
+                let counter = 2;
+                let uniqueName = `${newFolderName} (${counter})`;
+                
+                while (eventFolder.getFoldersByName(uniqueName).hasNext()) {
+                  counter++;
+                  uniqueName = `${newFolderName} (${counter})`;
+                  if (counter > 100) break;
+                }
+                
+                newFolderName = uniqueName;
+              }
+              
+              const newFolder = eventFolder.createFolder(newFolderName);
+              const newFolderId = newFolder.getId();
+              
+              // Update the Participant Folder ID in the sheet
+              sheet.getRange(editedRow, folderIdColIdx + 1).setValue(newFolderId);
+              
+              logMessage(`Nieuwe deelnemersmap aangemaakt: "${newFolderName}" (ID: ${newFolderId})`);
+              
+            } else {
+              logMessage(`FOUT: Kon event folder niet vinden voor "${eventName}".`);
+            }
+            
+          } catch (createError) {
+            logMessage(`FOUT bij aanmaken nieuwe map: ${createError.message}`);
+            Logger.log(`Create folder error: ${createError.toString()}`);
+          }
+        }
+      }
+      
+    } else {
+      logMessage(`Info: Geen Participant Folder ID gevonden voor rij ${editedRow}. Geen mapactie ondernomen.`);
+    }
+    
+  } catch (err) {
+    logMessage(`FOUT in handleParticipantNameChange: ${err.message}`);
+    Logger.log(`handleParticipantNameChange ERROR: ${err.toString()}\n${err.stack}`);
+  } finally {
+    flushLogs();
   }
 }

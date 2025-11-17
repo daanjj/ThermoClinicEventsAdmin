@@ -59,3 +59,4 @@ const FORM_DOB_QUESTION_TITLE = 'Geboortedatum';
 const FORM_CITY_QUESTION_TITLE = 'Woonplaats';
 const FORM_REG_METHOD_QUESTION_TITLE = 'Manier van Inschrijving';
 const FORM_CORE_MAIL_HEADER = 'CORE-mailadres';
+const DEFAULT_UNASSIGNED_PARTICIPANT_NAME = 'Geen persoon toegewezen';

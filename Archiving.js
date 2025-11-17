@@ -70,7 +70,6 @@ function archiveOldClinics(isManualTrigger) {
     if (numArchived === 0) {
       const message = 'Geen clinics ouder dan 30 dagen gevonden om te archiveren.';
       logMessage(message);
-      if (isManualTrigger) SpreadsheetApp.getUi().alert(message);
       logMessage(`----- EINDE ${logPrefix} -----`);
       return;
     }
@@ -98,6 +97,9 @@ function archiveOldClinics(isManualTrigger) {
       logMessage(`Deelnemers archief sheet '${ARCHIVE_PARTICIPANTS_SHEET_NAME}' aangemaakt.`);
     }
     
+    // Track standard headers for consistency across different response sheets
+    let standardHeaders = null;
+    
     [OPEN_FORM_RESPONSE_SHEET_NAME, BESLOTEN_FORM_RESPONSE_SHEET_NAME].forEach(sheetName => {
       const responseSheet = responseSs.getSheetByName(sheetName);
       if (!responseSheet) {
@@ -116,11 +118,31 @@ function archiveOldClinics(isManualTrigger) {
         return;
       }
       
-      // Set up participant archive sheet headers if empty
-      if (participantArchiveSheet.getLastRow() === 0) {
-        // Add source sheet column and original headers
-        const archiveHeaders = ['Bron Sheet'].concat(responseHeaders);
-        participantArchiveSheet.getRange(1, 1, 1, archiveHeaders.length).setValues([archiveHeaders]);
+      // Set standard headers on first iteration to ensure consistency
+      if (!standardHeaders) {
+        standardHeaders = responseHeaders.concat(['Bron Sheet']); // Add 'Bron Sheet' as last column
+        
+        // Set/verify headers in archive sheet
+        if (participantArchiveSheet.getLastRow() === 0) {
+          participantArchiveSheet.getRange(1, 1, 1, standardHeaders.length).setValues([standardHeaders]);
+          logMessage(`Archief headers ingesteld: ${standardHeaders.join(', ')}`);
+        } else {
+          // Verify existing headers match expected structure
+          const existingHeaders = participantArchiveSheet.getRange(1, 1, 1, participantArchiveSheet.getLastColumn()).getValues()[0];
+          if (JSON.stringify(existingHeaders) !== JSON.stringify(standardHeaders)) {
+            logMessage(`WAARSCHUWING: Bestaande headers in archief sheet komen niet overeen met verwachte headers voor '${sheetName}'.`);
+            logMessage(`Verwacht: ${standardHeaders.join(', ')}`);
+            logMessage(`Gevonden: ${existingHeaders.join(', ')}`);
+          }
+        }
+      } else {
+        // Verify current response sheet headers match the standard (excluding the 'Bron Sheet' column)
+        const expectedResponseHeaders = standardHeaders.slice(0, -1); // Remove 'Bron Sheet' from comparison
+        if (JSON.stringify(responseHeaders) !== JSON.stringify(expectedResponseHeaders)) {
+          logMessage(`WAARSCHUWING: Headers in '${sheetName}' komen niet overeen met standaard headers.`);
+          logMessage(`Standaard: ${expectedResponseHeaders.join(', ')}`);
+          logMessage(`'${sheetName}': ${responseHeaders.join(', ')}`);
+        }
       }
       
       const participantsToArchive = [];
@@ -132,10 +154,21 @@ function archiveOldClinics(isManualTrigger) {
         const participantClinicName = (row[eventColIdx] || '').replace(/\s\(.*\)$/, '').trim();
         
         if (archivedClinicNames.has(participantClinicName)) {
-          // Add source sheet info and participant data for archiving
-          const archiveRow = [sheetName].concat(row);
+          // Create archive row with original data + source sheet as last column
+          // Format: [Timestamp, Email, First Name, Last Name, Event, Phone, DOB, City, Participant#, etc., Bron Sheet]
+          const archiveRow = [...row, sheetName]; // Append source sheet as last column
+          
+          // Validate row length matches expected structure
+          if (archiveRow.length !== standardHeaders.length) {
+            logMessage(`WAARSCHUWING: Rij lengte (${archiveRow.length}) komt niet overeen met verwachte header lengte (${standardHeaders.length}) voor deelnemer in '${sheetName}'.`);
+          }
+          
           participantsToArchive.push(archiveRow);
           rowsToStrikeThrough.push(i + 1); // +1 because sheet rows are 1-indexed
+          
+          // Log the participant being archived for debugging
+          const participantEmail = row[responseHeaders.indexOf(FORM_EMAIL_QUESTION_TITLE)] || 'Onbekend email';
+          logMessage(`Archivering deelnemer: ${participantEmail} van clinic "${participantClinicName}" uit '${sheetName}'`);
         }
       }
       
@@ -158,13 +191,11 @@ function archiveOldClinics(isManualTrigger) {
     const plural = numArchived === 1 ? 'clinic' : 'clinics';
     const successMessage = `${numArchived} ${plural} gearchiveerd.`;
     logMessage(successMessage);
-    if (isManualTrigger) SpreadsheetApp.getUi().alert(successMessage);
 
   } catch (e) {
     const errorMessage = `FOUT tijdens archiveren: ${e.toString()}\n${e.stack}`;
     Logger.log(errorMessage);
     logMessage(errorMessage);
-    if (isManualTrigger) SpreadsheetApp.getUi().alert(errorMessage);
   } finally {
     logMessage(`----- EINDE ${logPrefix} -----`);
     flushLogs(); // Ensures logs are always saved
