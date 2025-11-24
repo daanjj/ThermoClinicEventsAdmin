@@ -2,7 +2,7 @@
 // which act as routers for the script's execution.
 
 function onOpen() {
-  SpreadsheetApp.getUi()
+  const menu = SpreadsheetApp.getUi()
     .createMenu('Thermoclinics Tools')
     .addItem('Verstuur mail naar deelnemers', 'showMailMergeDialog')
     .addItem('Stuur reminder om CORE-app te installeren', 'showCoreReminderDialog')
@@ -14,6 +14,28 @@ function onOpen() {
     .addItem('Update pop-ups voor alle formulieren', 'updateAllFormDropdowns')
     .addItem('Check of alle permissies zijn toegekend', 'forceAuthorization')
     .addToUi();
+  
+  // Check if user is logged in with the correct account and show warning if not
+  try {
+    const expectedEmail = "infothermoclinics@gmail.com";
+    const activeUserEmail = Session.getEffectiveUser().getEmail();
+    
+    if (activeUserEmail !== expectedEmail) {
+      // Show a one-time warning toast (non-intrusive)
+      SpreadsheetApp.getActiveSpreadsheet().toast(
+        `⚠️ U bent ingelogd als ${activeUserEmail}. Voor mail merge moet u ingelogd zijn als ${expectedEmail}. TIP: Gebruik een incognito venster!`,
+        '⚠️ Verkeerd Google Account',
+        10 // Show for 10 seconds
+      );
+    }
+  } catch (e) {
+    // If we can't check the user (permission not granted), show a toast suggesting authorization
+    SpreadsheetApp.getActiveSpreadsheet().toast(
+      'Ga naar "Thermoclinics Tools" → "Check of alle permissies zijn toegekend" om alle functies te kunnen gebruiken.',
+      'ℹ️ Autorisatie vereist',
+      8
+    );
+  }
 }
 
 function masterOnEdit(e) {

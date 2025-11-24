@@ -136,6 +136,20 @@ Via het menu kan een mail worden verstuurd naar de deelnemers van een specifieke
 - De branding consistent blijft
 - Er geen emails vanuit een persoonlijk account worden verstuurd
 
+**⚠️ BEST PRACTICE - Gebruik een Incognito Venster:**
+
+Om problemen met account-wisseling en autorisatie te voorkomen:
+1. Open **ALTIJD** een nieuw incognito/privé venster (Ctrl+Shift+N of Cmd+Shift+N)
+2. Log in met **ALLEEN** het account infothermoclinics@gmail.com
+3. Open het spreadsheet in dat incognito venster
+4. Voer alle handelingen (mail merge, etc.) uit in dat venster
+
+**Waarom incognito?**
+- Voorkomt conflict met andere Google-accounts die in uw browser zijn ingelogd
+- Voorkomt "ERR_TOO_MANY_REDIRECTS" fouten bij Apps Script autorisatie
+- Zorgt dat de juiste account-permissies worden gebruikt
+- Geen cookies of sessies van andere accounts die conflicteren
+
 **Automatische controle:**
 - Bij het starten van een mail merge controleert het systeem automatisch of u bent ingelogd met het juiste account
 - Als u bent ingelogd met een ander account, krijgt u een waarschuwingsvenster:

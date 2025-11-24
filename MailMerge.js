@@ -123,7 +123,31 @@ function performMailMerge(selectedClinic, selectedTemplateId, selectedTemplateNa
   
   // Check if the correct Google user is active
   const expectedEmail = "infothermoclinics@gmail.com";
-  const activeUserEmail = Session.getEffectiveUser().getEmail();
+  let activeUserEmail;
+  
+  try {
+    activeUserEmail = Session.getEffectiveUser().getEmail();
+  } catch (permissionError) {
+    // This error occurs when the user hasn't granted the userinfo.email permission,
+    // or when they switched accounts in the browser without re-authorizing
+    const ui = SpreadsheetApp.getUi();
+    ui.alert(
+      'Autorisatie vereist',
+      'U heeft nog niet alle benodigde rechten toegekend, of u heeft van Google-account gewisseld.\n\n' +
+      '⚠️ BELANGRIJKE OPLOSSING:\n' +
+      '1. Open een NIEUW INCOGNITO/PRIVÉ VENSTER (Ctrl+Shift+N of Cmd+Shift+N)\n' +
+      '2. Log in met ALLEEN het account: ' + expectedEmail + '\n' +
+      '3. Open het spreadsheet opnieuw in dat incognito venster\n' +
+      '4. Ga naar "Thermoclinics Tools" → "Check of alle permissies zijn toegekend"\n' +
+      '5. Keur alle rechten goed\n' +
+      '6. Probeer daarna de mailmerge opnieuw\n\n' +
+      '💡 TIP: Werk ALTIJD in een incognito venster met alleen ' + expectedEmail + ' ingelogd om redirect-fouten te voorkomen.\n\n' +
+      'Technische details: ' + permissionError.message,
+      ui.ButtonSet.OK
+    );
+    logMessage(`Mailmerge mislukt: Geen toegang tot gebruikersinfo. Fout: ${permissionError.message}`);
+    return;
+  }
   
   if (activeUserEmail !== expectedEmail) {
     const ui = SpreadsheetApp.getUi();
