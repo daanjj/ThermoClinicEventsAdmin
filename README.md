@@ -58,10 +58,12 @@ The script is organized into logical modules for maintainability and clarity:
 1.  **Copy Files**: Copy all `.js` and `.html` files into a new Google Apps Script project bound to the Google Sheet that will receive the form responses.
 2.  **Configure `Constants.js`**: Open `Constants.js` and replace all placeholder IDs with the actual IDs from your Google Drive folders, Google Sheets, Google Forms, and email templates. This is the most critical step.
 3.  **Enable Advanced Services**: In the Apps Script Editor, go to `Services` and ensure the `Google Drive API` is enabled.
-4.  **Grant Permissions**:
+4.  **Configure OAuth Scopes**: The `appsscript.json` file includes all necessary OAuth scopes, including `userinfo.email` for account verification during mail merge operations.
+5.  **Grant Permissions**:
     *   Run the `forceAuthorization` function from the `Utils.js` file manually from the script editor.
-    *   This will trigger a series of permission prompts from Google. You must approve all of them for the script to function correctly. You may need to run it a second time after granting initial permissions.
-5.  **Set Up Triggers**: In the Apps Script Editor, go to the `Triggers` section (clock icon) and set up the following:
+    *   This will trigger a series of permission prompts from Google. You must approve all of them for the script to function correctly, including the userinfo.email permission required for mail merge account verification.
+    *   You may need to run it a second time after granting initial permissions.
+6.  **Set Up Triggers**: In the Apps Script Editor, go to the `Triggers` section (clock icon) and set up the following:
     *   `masterOnFormSubmit` to run from the spreadsheet **On form submit**.
     *   `masterOnEdit` to run from the spreadsheet **On edit**.
     *   `runDailyArchive` to run as a **Time-driven** trigger, daily, at a time of your choosing (e.g., 2-3 am).

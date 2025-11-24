@@ -21,7 +21,7 @@ Bij het openen van het spreadsheet verschijnt er een extra menu genaamd "Thermoc
 * **Lees Excel-bestand in voor besloten clinic:** Start de procedure om deelnemers voor een besloten clinic te importeren vanuit een Excel-bestand.  
 * **Archiveer oudere clinics:** Start handmatig het archiveringsproces. Dit is dezelfde functie die ook elke nacht automatisch draait.  
 * **Update pop-ups voor alle formulieren:** Werkt de keuzelijsten in alle gekoppelde Google Formulieren bij op basis van de actuele data in de Data clinics sheet. Dit gebeurt ook automatisch na elke aanmelding, maar kan handig zijn voor een handmatige synchronisatie.  
-* **Check of alle permissies zijn toegekend:** Een functie voor de eerste ingebruikname of bij problemen. Deze functie triggert de autorisatievraag van Google voor alle benodigde services (Drive, Gmail, Calendar, etc.).
+* **Check of alle permissies zijn toegekend:** Een functie voor de eerste ingebruikname of bij problemen. Deze functie triggert de autorisatievraag van Google voor alle benodigde services (Drive, Gmail, Calendar, User Info, etc.). Deze check omvat ook de verificatie van de userinfo.email permissie die nodig is voor account verificatie bij mail merge.
 
 4. # Automatische Processen
 

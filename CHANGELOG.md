@@ -60,6 +60,11 @@
 #### Triggers Enhancement
 - `masterOnEdit()` now routes to `handleClinicTypeChange()` for type column changes in Data clinics sheet
 
+#### OAuth Scopes
+- **Added `userinfo.email` scope**: Required for `Session.getEffectiveUser()` to verify active user account
+- **Updated `appsscript.json`**: Includes new scope for mail merge account verification
+- **Enhanced `forceAuthorization()`**: Now checks userinfo.email permission and logs active user for debugging
+
 ## Updates (November 2024)
 
 ### ✨ New Features
