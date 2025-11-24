@@ -71,6 +71,15 @@ function getClinicsForReminder() {
 function sendCoreAppReminder(selectedClinic) {
   const logHeader = `----- START CORE-app reminder voor ${selectedClinic} -----`;
   logMessage(logHeader);
+  
+  // Verify Gmail alias is available
+  const desiredAlias = "info@thermoclinics.nl";
+  const availableAliases = GmailApp.getAliases();
+  const fromAlias = availableAliases.includes(desiredAlias) ? desiredAlias : null;
+  
+  if (!fromAlias) {
+    logMessage(`WAARSCHUWING: Alias "${desiredAlias}" niet gevonden voor CORE reminder. Beschikbare aliassen: ${availableAliases.join(', ')}. Emails worden verstuurd zonder 'from' alias.`);
+  }
 
   try {
     // ... (Logic to find clinic type and get participants remains the same)
@@ -155,10 +164,14 @@ function sendCoreAppReminder(selectedClinic) {
         const finalHtml = `<!DOCTYPE html>...${finalHtmlBody}...</html>`; // (Your full HTML boilerplate here)
         // =======================================
 
-        GmailApp.sendEmail(recipientEmail, finalSubject, '', {
+        const mailOptions = {
           name: preparedTemplate.senderName,
           htmlBody: finalHtml
-        });
+        };
+        if (fromAlias) {
+          mailOptions.from = fromAlias;
+        }
+        GmailApp.sendEmail(recipientEmail, finalSubject, '', mailOptions);
         sentCount++;
         
         logMessage(`CORE-app Reminder verstuurd aan: ${recipientEmail}, Onderwerp: "${finalSubject}"`);

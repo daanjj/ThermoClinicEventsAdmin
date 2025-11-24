@@ -4,7 +4,14 @@
 // from the open and besloten forms.
 
 function processBooking(e) {
-  const fromAlias = "info@thermoclinics.nl";
+  // Verify Gmail alias is available
+  const desiredAlias = "info@thermoclinics.nl";
+  const availableAliases = GmailApp.getAliases();
+  const fromAlias = availableAliases.includes(desiredAlias) ? desiredAlias : null;
+  
+  if (!fromAlias) {
+    logMessage(`WAARSCHUWING: Alias "${desiredAlias}" niet gevonden voor bevestigingsmail. Beschikbare aliassen: ${availableAliases.join(', ')}. Email wordt verstuurd zonder 'from' alias.`);
+  }
   try {
     if (!e || !e.namedValues) {
         logMessage(`processBooking ERROR: No event object or namedValues received.`);
@@ -313,7 +320,11 @@ function processBooking(e) {
       
       const mergedMail = mergeSingleTemplate(templateId, placeholderMap);
       
-      GmailApp.sendEmail(placeholderMap['<Email>'], mergedMail.subject, '', { name: mergedMail.senderName, htmlBody: mergedMail.htmlBody, from: fromAlias });
+      const mailOptions = { name: mergedMail.senderName, htmlBody: mergedMail.htmlBody };
+      if (fromAlias) {
+        mailOptions.from = fromAlias;
+      }
+      GmailApp.sendEmail(placeholderMap['<Email>'], mergedMail.subject, '', mailOptions);
       
       const templateName = DriveApp.getFileById(templateId).getName();
       logMessage(`${templateType} registratiebevestiging verstuurd aan: ${placeholderMap['<Email>']}, Onderwerp: "${mergedMail.subject}"`);
