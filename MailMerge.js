@@ -119,8 +119,36 @@ function mergeSingleTemplate(templateId, placeholderMap) {
  */
 function performMailMerge(selectedClinic, selectedTemplateId, selectedTemplateName, selectedAttachmentIds) {
   const logHeader = `----- START mailmerge voor ${selectedClinic} met sjabloon ${selectedTemplateName} -----`;
-  const fromAlias = "info@thermoclinics.nl";
   logMessage(logHeader);
+  
+  // Check if the correct Google user is active
+  const expectedEmail = "infothermoclinics@gmail.com";
+  const activeUserEmail = Session.getEffectiveUser().getEmail();
+  
+  if (activeUserEmail !== expectedEmail) {
+    const ui = SpreadsheetApp.getUi();
+    const response = ui.alert(
+      'Verkeerd account',
+      `LET OP: mailmerge dient vanuit user ${expectedEmail} gedaan te worden en niet vanuit ${activeUserEmail}. Weet u zeker dat u door wilt gaan? Mails zullen uit uw naam worden verzonden en niet vanuit info@thermoclinics.nl!`,
+      ui.ButtonSet.YES_NO
+    );
+    
+    if (response === ui.Button.NO) {
+      logMessage(`Mailmerge geannuleerd: verkeerd Google account (${activeUserEmail} in plaats van ${expectedEmail}).`);
+      return;
+    } else {
+      logMessage(`WAARSCHUWING: Mailmerge uitgevoerd vanuit ${activeUserEmail} in plaats van ${expectedEmail}.`);
+    }
+  }
+  
+  // Verify Gmail alias is available
+  const desiredAlias = "info@thermoclinics.nl";
+  const availableAliases = GmailApp.getAliases();
+  const fromAlias = availableAliases.includes(desiredAlias) ? desiredAlias : null;
+  
+  if (!fromAlias) {
+    logMessage(`WAARSCHUWING: Alias "${desiredAlias}" niet gevonden. Beschikbare aliassen: ${availableAliases.join(', ')}. Emails worden verstuurd zonder 'from' alias.`);
+  }
 
   try {
     const dataClinicsSpreadsheet = SpreadsheetApp.openById(DATA_CLINICS_SPREADSHEET_ID);
@@ -255,10 +283,12 @@ function performMailMerge(selectedClinic, selectedTemplateId, selectedTemplateNa
           if (participantBlobs.length > 0 || hasGenericAttachments) {
             const mailOptions = { 
               name: preparedTemplate.senderName, 
-              htmlBody: finalHtml, 
-              from: fromAlias,
+              htmlBody: finalHtml,
               attachments: [...genericAttachments, ...participantBlobs]
             };
+            if (fromAlias) {
+              mailOptions.from = fromAlias;
+            }
             
             GmailApp.sendEmail(email, participantSubject, '', mailOptions);
             sentCount++;
@@ -307,7 +337,10 @@ function performMailMerge(selectedClinic, selectedTemplateId, selectedTemplateNa
         
         } else {
           // --- LOGIC FOR NON-ATTACHMENT TEMPLATES ---
-          const mailOptions = { name: preparedTemplate.senderName, htmlBody: finalHtml, from: fromAlias, attachments: [...genericAttachments] };
+          const mailOptions = { name: preparedTemplate.senderName, htmlBody: finalHtml, attachments: [...genericAttachments] };
+          if (fromAlias) {
+            mailOptions.from = fromAlias;
+          }
           GmailApp.sendEmail(email, participantSubject, '', mailOptions);
           sentCount++;
           

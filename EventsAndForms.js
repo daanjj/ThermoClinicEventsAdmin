@@ -134,6 +134,142 @@ function handleEventChange(e) {
   }
 }
 
+/**
+ * Handles clinic type changes (Open <-> Besloten) by moving all participants 
+ * from one response sheet to the other.
+ * @param {Object} e The event object from the onEdit trigger.
+ */
+function handleClinicTypeChange(e) {
+  // --- Step 1: Validate the edit ---
+  if (!e || !e.range || !e.oldValue || !e.value || e.oldValue === e.value) {
+    return; // Not a relevant value change
+  }
+  
+  const sheet = e.range.getSheet();
+  if (sheet.getName() !== DATA_CLINICS_SHEET_NAME) {
+    return;
+  }
+  
+  const editedRow = e.range.getRow();
+  if (editedRow < DATA_CLINICS_START_ROW) {
+    return; // Ignore header edits
+  }
+  
+  const editedColumn = e.range.getColumn();
+  
+  // Check if the edited column is the Type column
+  if (editedColumn !== TYPE_COLUMN_INDEX) {
+    return; // Not the type column
+  }
+  
+  const oldType = String(e.oldValue).trim().toLowerCase();
+  const newType = String(e.value).trim().toLowerCase();
+  
+  // Validate types
+  if (!['open', 'besloten'].includes(oldType) || !['open', 'besloten'].includes(newType)) {
+    logMessage(`WAARSCHUWING: Onverwachte type waarde. Oud: "${e.oldValue}", Nieuw: "${e.value}". Verwacht 'Open' of 'Besloten'.`);
+    return;
+  }
+  
+  logMessage(`Type wijziging gedetecteerd in '${DATA_CLINICS_SHEET_NAME}' op rij ${editedRow}. Oud: "${e.oldValue}", Nieuw: "${e.value}".`);
+  
+  // --- Step 2: Get event details ---
+  const rowData = sheet.getRange(editedRow, 1, 1, sheet.getLastColumn()).getValues()[0];
+  const dateValue = rowData[DATE_COLUMN_INDEX - 1];
+  const timeValue = rowData[TIME_COLUMN_INDEX - 1];
+  const locationValue = rowData[LOCATION_COLUMN_INDEX - 1];
+  
+  if (!dateValue || !timeValue || !locationValue) {
+    logMessage(`FOUT: Kan event niet identificeren. Datum, tijd of locatie ontbreekt op rij ${editedRow}.`);
+    return;
+  }
+  
+  const dateString = getDutchDateString(new Date(dateValue));
+  const eventName = `${dateString} ${String(timeValue).trim()}, ${String(locationValue).trim()}`;
+  
+  logMessage(`Deelnemers verplaatsen voor event: "${eventName}" van ${oldType} naar ${newType}.`);
+  
+  // --- Step 3: Move participants from old sheet to new sheet ---
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const oldSheetName = oldType === 'open' ? OPEN_FORM_RESPONSE_SHEET_NAME : BESLOTEN_FORM_RESPONSE_SHEET_NAME;
+  const newSheetName = newType === 'open' ? OPEN_FORM_RESPONSE_SHEET_NAME : BESLOTEN_FORM_RESPONSE_SHEET_NAME;
+  
+  const oldSheet = ss.getSheetByName(oldSheetName);
+  const newSheet = ss.getSheetByName(newSheetName);
+  
+  if (!oldSheet || !newSheet) {
+    logMessage(`FOUT: Kon respons-tabbladen niet vinden. Oud: '${oldSheetName}', Nieuw: '${newSheetName}'.`);
+    return;
+  }
+  
+  // Get all data from old sheet
+  const oldSheetData = oldSheet.getDataRange().getValues();
+  if (oldSheetData.length < 2) {
+    logMessage(`Geen deelnemers gevonden in '${oldSheetName}' om te verplaatsen.`);
+    return;
+  }
+  
+  const oldHeaders = oldSheetData[0];
+  const eventColIdx = oldHeaders.indexOf(FORM_EVENT_QUESTION_TITLE);
+  
+  if (eventColIdx === -1) {
+    logMessage(`FOUT: Kolom '${FORM_EVENT_QUESTION_TITLE}' niet gevonden in '${oldSheetName}'.`);
+    return;
+  }
+  
+  // Find rows that match this event
+  const rowsToMove = [];
+  const rowIndicesToDelete = [];
+  
+  for (let i = 1; i < oldSheetData.length; i++) {
+    const row = oldSheetData[i];
+    const eventNameInSheet = (row[eventColIdx] || '').replace(/\s\(.*\)$/, '').trim();
+    
+    if (eventNameInSheet === eventName) {
+      rowsToMove.push(row);
+      rowIndicesToDelete.push(i + 1); // +1 because sheet rows are 1-indexed
+    }
+  }
+  
+  if (rowsToMove.length === 0) {
+    logMessage(`Geen deelnemers gevonden voor event "${eventName}" in '${oldSheetName}'.`);
+    return;
+  }
+  
+  logMessage(`${rowsToMove.length} deelnemer(s) gevonden om te verplaatsen van '${oldSheetName}' naar '${newSheetName}'.`);
+  
+  // --- Step 4: Verify headers match between sheets ---
+  const newSheetData = newSheet.getDataRange().getValues();
+  const newHeaders = newSheetData[0];
+  
+  // Check if headers are identical
+  if (oldHeaders.length !== newHeaders.length || !oldHeaders.every((h, idx) => h === newHeaders[idx])) {
+    logMessage(`WAARSCHUWING: Headers in '${oldSheetName}' en '${newSheetName}' komen niet overeen. Deelnemers kunnen niet worden verplaatst.`);
+    Logger.log(`Old headers: ${JSON.stringify(oldHeaders)}`);
+    Logger.log(`New headers: ${JSON.stringify(newHeaders)}`);
+    return;
+  }
+  
+  // --- Step 5: Copy rows to new sheet ---
+  const lastRowInNewSheet = newSheet.getLastRow();
+  newSheet.insertRowsAfter(lastRowInNewSheet, rowsToMove.length);
+  
+  rowsToMove.forEach((row, index) => {
+    const targetRow = lastRowInNewSheet + index + 1;
+    newSheet.getRange(targetRow, 1, 1, row.length).setValues([row]);
+  });
+  
+  logMessage(`${rowsToMove.length} deelnemer(s) gekopieerd naar '${newSheetName}'.`);
+  
+  // --- Step 6: Delete rows from old sheet (in reverse order to avoid index shifting) ---
+  rowIndicesToDelete.reverse().forEach(rowIndex => {
+    oldSheet.deleteRow(rowIndex);
+  });
+  
+  logMessage(`${rowsToMove.length} deelnemer(s) verwijderd uit '${oldSheetName}'.`);
+  logMessage(`Type wijziging afgerond: ${rowsToMove.length} deelnemer(s) verplaatst van ${oldType} naar ${newType}.`);
+}
+
 function updateAllFormDropdowns() {
   populateFormDropdown('open');
   populateFormDropdown('besloten');

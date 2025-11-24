@@ -199,7 +199,7 @@ function processExcelFile(fileId) {
 
     // --- STEP 3: Create or find the main Event Folder in Drive ---
     const eventDateFormattedForFolder = Utilities.formatDate(eventDate, FORMATTING_TIME_ZONE, DATE_FORMAT_YYYYMMDD);
-    const eventTimeFormatted = eventTime.replace(/:|\./g, ''); // Remove colons/dots for folder name
+    const eventTimeFormatted = eventTime.replace(/:|\.\|/g, ''); // Remove colons/dots for folder name
     const eventFolderName = `${eventDateFormattedForFolder} ${eventTimeFormatted} ${eventLocation}`;
     
     const parentFolder = DriveApp.getFolderById(PARENT_EVENT_FOLDER_ID);
@@ -209,6 +209,11 @@ function processExcelFile(fileId) {
     if (eventFolders.hasNext()) {
       eventFolder = eventFolders.next();
       logMessage(`Bestaande Event Folder "${eventFolderName}" gevonden met ID: ${eventFolder.getId()}.`);
+      
+      // Check for duplicates
+      if (eventFolders.hasNext()) {
+        logMessage(`WAARSCHUWING: Meerdere mappen gevonden met naam "${eventFolderName}". Eerste map wordt gebruikt (ID: ${eventFolder.getId()}).`);
+      }
     } else {
       eventFolder = parentFolder.createFolder(eventFolderName);
       logMessage(`Nieuwe Event Folder "${eventFolderName}" aangemaakt met ID: ${eventFolder.getId()}.`);

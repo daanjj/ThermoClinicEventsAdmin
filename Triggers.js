@@ -23,8 +23,9 @@ function masterOnEdit(e) {
 
     switch (sheetName) {
       case DATA_CLINICS_SHEET_NAME:
-        Logger.log(`Routing to handleEventChange(), syncCalendarEventFromSheet(), and updateAllFormDropdowns().`);
+        Logger.log(`Routing to handleEventChange(), handleClinicTypeChange(), syncCalendarEventFromSheet(), and updateAllFormDropdowns().`);
         handleEventChange(e); // Handle date, time, and location changes with folder renames
+        handleClinicTypeChange(e); // Handle clinic type changes (Open <-> Besloten)
         syncCalendarEventFromSheet(e.range.getRow()); // Sync calendar for any edit (including max seats changes)
         updateAllFormDropdowns();
         break;

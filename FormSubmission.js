@@ -40,7 +40,9 @@ function processBooking(e) {
       '<Tijd>': time,
       '<Telefoonnummer>': String(e.namedValues[FORM_PHONE_QUESTION_TITLE]?.[0] || '').trim(),
       '<Geboortedatum>': String(e.namedValues[FORM_DOB_QUESTION_TITLE]?.[0] || '').trim(),
-      '<Woonplaats>': String(e.namedValues[FORM_CITY_QUESTION_TITLE]?.[0] || '').trim()
+      '<Woonplaats>': String(e.namedValues[FORM_CITY_QUESTION_TITLE]?.[0] || '').trim(),
+      '<Opmerking>': String(e.namedValues[FORM_OPMERKING_QUESTION_TITLE]?.[0] || '').trim(),
+      '<Motivatie>': String(e.namedValues[FORM_MOTIVATIE_QUESTION_TITLE]?.[0] || '').trim()
     };
     
     // ... (Your existing logic for finding the row, updating seats, and creating folders remains the same)
@@ -98,6 +100,10 @@ function processBooking(e) {
     const existingParticipantsMap = {}; // Key: "email|eventname" -> { sheetName, rowIndex }
     const relevantSheet = ss.getSheetByName(expectedSheetName);
     
+    // Get the current submission row number to exclude it from duplicate detection
+    const currentSubmissionRow = e.range.getRow();
+    const currentSubmissionSheetName = e.range.getSheet().getName();
+    
     if (relevantSheet) {
       const data = relevantSheet.getDataRange().getValues();
       if (data.length >= 2) {
@@ -107,12 +113,19 @@ function processBooking(e) {
         
         if (headerMap[FORM_EMAIL_QUESTION_TITLE] !== undefined && headerMap[FORM_EVENT_QUESTION_TITLE] !== undefined) {
           data.forEach((row, index) => {
+            const rowNumber = index + 2; // +2 because: +1 for 1-based indexing, +1 for header row
+            
+            // Skip the current submission row to avoid detecting itself as a duplicate
+            if (relevantSheet.getName() === currentSubmissionSheetName && rowNumber === currentSubmissionRow) {
+              return; // Skip this row
+            }
+            
             const email = String(row[headerMap[FORM_EMAIL_QUESTION_TITLE]] || '').trim().toLowerCase();
             const eventName = String(row[headerMap[FORM_EVENT_QUESTION_TITLE]] || '').replace(/\s\(.*\)$/, '').trim();
             if (email && eventName) {
               const key = `${email}|${eventName}`;
               if (!existingParticipantsMap[key]) {
-                existingParticipantsMap[key] = { sheetName: expectedSheetName, rowIndex: index + 2 };
+                existingParticipantsMap[key] = { sheetName: expectedSheetName, rowIndex: rowNumber };
               }
             }
           });
@@ -167,6 +180,14 @@ function processBooking(e) {
               updateSheet.getRange(existingParticipantInfo.rowIndex, updateHeaderMap[FORM_CITY_QUESTION_TITLE] + 1).setValue(placeholderMap['<Woonplaats>']);
               logMessage(`  Updated Woonplaats to: ${placeholderMap['<Woonplaats>']}`);
             }
+            if (updateHeaderMap[FORM_OPMERKING_QUESTION_TITLE] !== undefined && placeholderMap['<Opmerking>']) {
+              updateSheet.getRange(existingParticipantInfo.rowIndex, updateHeaderMap[FORM_OPMERKING_QUESTION_TITLE] + 1).setValue(placeholderMap['<Opmerking>']);
+              logMessage(`  Updated Opmerking to: ${placeholderMap['<Opmerking>']}`);
+            }
+            if (updateHeaderMap[FORM_MOTIVATIE_QUESTION_TITLE] !== undefined && placeholderMap['<Motivatie>']) {
+              updateSheet.getRange(existingParticipantInfo.rowIndex, updateHeaderMap[FORM_MOTIVATIE_QUESTION_TITLE] + 1).setValue(placeholderMap['<Motivatie>']);
+              logMessage(`  Updated Motivatie to: ${placeholderMap['<Motivatie>']}`);
+            }
             
             // Update timestamp to reflect the latest submission
             if (updateHeaderMap['Timestamp'] !== undefined) {
@@ -187,6 +208,23 @@ function processBooking(e) {
             if (updateHeaderMap[DEELNEMERNUMMER_HEADER] !== undefined) participantSequenceNumber = String(updateSheet.getRange(existingParticipantInfo.rowIndex, updateHeaderMap[DEELNEMERNUMMER_HEADER] + 1).getValue() || '').trim();
             if (updateHeaderMap[DRIVE_FOLDER_ID_HEADER] !== undefined) participantSubfolderId = String(updateSheet.getRange(existingParticipantInfo.rowIndex, updateHeaderMap[DRIVE_FOLDER_ID_HEADER] + 1).getValue() || '').trim();
             
+            // Rename participant folder if first name or last name was updated
+            if (participantSubfolderId && (placeholderMap['<Voornaam>'] || placeholderMap['<Achternaam>'])) {
+              try {
+                const folder = DriveApp.getFolderById(participantSubfolderId);
+                const formattedParticipantNumber = Utilities.formatString('%02d', parseInt(participantSequenceNumber) || 0);
+                const newFolderName = `${formattedParticipantNumber} ${placeholderMap['<Voornaam>']} ${placeholderMap['<Achternaam>']}`.replace(/\s+/g, ' ').trim();
+                const currentFolderName = folder.getName();
+                
+                if (currentFolderName !== newFolderName) {
+                  folder.setName(newFolderName);
+                  logMessage(`  Participant folder renamed from "${currentFolderName}" to "${newFolderName}"`);
+                }
+              } catch (folderError) {
+                logMessage(`  WAARSCHUWING: Kon participant folder niet hernoemen. Fout: ${folderError.message}`);
+              }
+            }
+            
             SpreadsheetApp.flush(); // Ensure updates are committed
           }
 
@@ -204,12 +242,23 @@ function processBooking(e) {
         placeholderMap['<Deelnemernummer>'] = participantSequenceNumber;
 
         const eventDateFormatted = Utilities.formatDate(new Date(sheetDateValue), FORMATTING_TIME_ZONE, DATE_FORMAT_YYYYMMDD);
-        const timeFormatted = String(rowData[TIME_COLUMN_INDEX - 1]).trim().replace(/:|\./g, '');
+        const timeFormatted = String(rowData[TIME_COLUMN_INDEX - 1]).trim().replace(/:|\.\|/g, '');
         const eventFolderName = `${eventDateFormatted} ${timeFormatted} ${String(rowData[LOCATION_COLUMN_INDEX-1]).trim()}`;
         
         const parentFolder = DriveApp.getFolderById(PARENT_EVENT_FOLDER_ID);
         const folders = parentFolder.getFoldersByName(eventFolderName);
-        const eventFolder = folders.hasNext() ? folders.next() : parentFolder.createFolder(eventFolderName);
+        
+        // Check for duplicate folders
+        let eventFolder;
+        if (folders.hasNext()) {
+          eventFolder = folders.next();
+          if (folders.hasNext()) {
+            logMessage(`WAARSCHUWING: Meerdere mappen gevonden met naam "${eventFolderName}". Eerste map wordt gebruikt (ID: ${eventFolder.getId()}).`);
+          }
+        } else {
+          eventFolder = parentFolder.createFolder(eventFolderName);
+          logMessage(`Nieuwe Event Folder aangemaakt: "${eventFolderName}" (ID: ${eventFolder.getId()}).`);
+        }
 
         if (eventFolderIdColIdx !== -1 && !rowData[eventFolderIdColIdx]) {
           dataClinicsSheet.getRange(foundRowIndex, eventFolderIdColIdx + 1).setValue(eventFolder.getId());
