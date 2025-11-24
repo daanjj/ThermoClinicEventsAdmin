@@ -103,6 +103,14 @@ function forceAuthorization() {
       muteHttpExceptions: true
     });
 
+    // --- User Info Check (for Session.getEffectiveUser) ---
+    try {
+      const userEmail = Session.getEffectiveUser().getEmail();
+      Logger.log(`User info check passed. Active user: ${userEmail}`);
+    } catch (userInfoError) {
+      throw new Error("De userinfo.email permissie is niet toegekend. Dit is nodig voor account verificatie bij mail merge. Fout: " + userInfoError.message);
+    }
+
     // --- Advanced Drive Service Check ---
     try {
       Drive.About.get();
