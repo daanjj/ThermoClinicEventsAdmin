@@ -262,6 +262,43 @@ function logToDocument(message) {
   }
 }
 
+/**
+ * Checks if an email address is in the non-participant list (test/host accounts)
+ * These accounts should not be counted toward participant totals.
+ * Reads from the 'Non-participant emails' sheet in the active spreadsheet.
+ * Expected sheet format: Column A = Name (for readability), Column B = Email address
+ * Row 1 is a header row and is skipped.
+ * @param {string} email - The email address to check
+ * @returns {boolean} - True if the email should be excluded from participant counts
+ */
+function isNonParticipantEmail(email) {
+  if (!email) return false;
+  const normalizedEmail = String(email).trim().toLowerCase();
+  
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName(NON_PARTICIPANT_EMAILS_SHEET_NAME);
+    
+    if (!sheet) {
+      // Sheet doesn't exist yet, no emails to exclude
+      return false;
+    }
+    
+    const data = sheet.getDataRange().getValues();
+    // Start from row 2 (index 1) to skip header, check column B (index 1) for email addresses
+    for (let i = 1; i < data.length; i++) {
+      const rowEmail = String(data[i][1] || '').trim().toLowerCase();
+      if (rowEmail && rowEmail === normalizedEmail) {
+        return true;
+      }
+    }
+    return false;
+  } catch (e) {
+    Logger.log(`Error checking non-participant emails: ${e.message}`);
+    return false;
+  }
+}
+
 function getDutchDateString(dateObject) {
   if (!dateObject || !(dateObject instanceof Date) || isNaN(dateObject.getTime())) {
     return 'onbekende datum';

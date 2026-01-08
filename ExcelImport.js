@@ -291,10 +291,19 @@ function processExcelFile(fileId) {
         // New participant, add to the sheet and create Drive folder
         const bookedSeatsRange = dataClinicsSheet.getRange(clinicDataRowIndex, BOOKED_SEATS_COLUMN_INDEX);
         const currentBookedSeats = bookedSeatsRange.getValue() || 0;
-        const newBookedSeats = currentBookedSeats + 1;
-        bookedSeatsRange.setValue(newBookedSeats); // Update booked seats count in Data Clinics sheet
+        const isNonParticipant = isNonParticipantEmail(email);
         
-        const participantSequenceNumber = Utilities.formatString('%02d', newBookedSeats);
+        let participantSequenceNumber;
+        if (isNonParticipant) {
+          // Non-participant (test/host account): do NOT increment booked seats count
+          logMessage(`Non-participant account gedetecteerd (${email}). Deelnemertelling NIET verhoogd.`);
+          participantSequenceNumber = 'NP' + Utilities.formatString('%02d', currentBookedSeats + 1);
+        } else {
+          // Regular participant: increment the count
+          const newBookedSeats = currentBookedSeats + 1;
+          bookedSeatsRange.setValue(newBookedSeats); // Update booked seats count in Data Clinics sheet
+          participantSequenceNumber = Utilities.formatString('%02d', newBookedSeats);
+        }
         const participantSubfolderName = `${participantSequenceNumber} ${firstName} ${lastName}`.replace(/\s+/g, ' ').trim();
         const participantSubfolder = eventFolder.createFolder(participantSubfolderName);
 

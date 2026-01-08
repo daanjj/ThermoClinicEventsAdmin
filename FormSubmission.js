@@ -243,9 +243,19 @@ function processBooking(e) {
 
         // No duplicate found: proceed to add as new participant (increase booked seats, create folder)
         const currentBookedSeats = (rowData[BOOKED_SEATS_COLUMN_INDEX - 1] || 0);
-        const newBookedSeats = currentBookedSeats + 1;
-        dataClinicsSheet.getRange(foundRowIndex, BOOKED_SEATS_COLUMN_INDEX).setValue(newBookedSeats);
-        participantSequenceNumber = Utilities.formatString('%02d', newBookedSeats);
+        const participantEmail = placeholderMap['<Email>'];
+        const isNonParticipant = isNonParticipantEmail(participantEmail);
+        
+        if (isNonParticipant) {
+          // Non-participant (test/host account): do NOT increment booked seats count
+          logMessage(`Non-participant account gedetecteerd (${participantEmail}). Deelnemertelling NIET verhoogd.`);
+          participantSequenceNumber = 'NP' + Utilities.formatString('%02d', currentBookedSeats + 1);
+        } else {
+          // Regular participant: increment the count
+          const newBookedSeats = currentBookedSeats + 1;
+          dataClinicsSheet.getRange(foundRowIndex, BOOKED_SEATS_COLUMN_INDEX).setValue(newBookedSeats);
+          participantSequenceNumber = Utilities.formatString('%02d', newBookedSeats);
+        }
         placeholderMap['<Deelnemernummer>'] = participantSequenceNumber;
 
         const eventDateFormatted = Utilities.formatDate(new Date(sheetDateValue), FORMATTING_TIME_ZONE, DATE_FORMAT_YYYYMMDD);

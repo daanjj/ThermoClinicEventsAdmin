@@ -32,6 +32,7 @@ const CALENDAR_EVENT_ID_HEADER = 'Calendar Event ID';
 const EVENT_FOLDER_ID_HEADER = 'Event Folder ID'; // NEW CONSTANT
 const ARCHIVE_SHEET_NAME = 'ARCHIEF oudere clinics';
 const ARCHIVE_PARTICIPANTS_SHEET_NAME = 'ARCHIEF deelnemers';
+const NON_PARTICIPANT_EMAILS_SHEET_NAME = 'Non-participant emails';
 
 const CORE_APP_SHEET_NAME = 'CORE-app geïnstalleerd';
 const CORE_APP_CLINIC_HEADER = 'Voor welke clinic heb je je opgegeven?';
