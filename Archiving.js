@@ -18,11 +18,16 @@ function runDailyArchive() {
  * Run this manually from the Apps Script editor to fix historical data.
  */
 function fixMissedArchivedParticipants() {
-  logMessage(`----- START Herstel gemiste gearchiveerde deelnemers -----`);
+  logMessage(`----- START Herstel gemiste gearchiveerde deelnemers  -----`);
   
   try {
     const dataClinicsSpreadsheet = SpreadsheetApp.openById(DATA_CLINICS_SPREADSHEET_ID);
     const responseSs = SpreadsheetApp.getActiveSpreadsheet();
+    
+    // Define the threshold for archiving (30 days old)
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    thirtyDaysAgo.setHours(0, 0, 0, 0);
     
     // Get archived clinic names from the archive sheet
     const archiveSheet = dataClinicsSpreadsheet.getSheetByName(ARCHIVE_SHEET_NAME);
@@ -127,7 +132,21 @@ function fixMissedArchivedParticipants() {
         const participantClinicName = String(row[eventColIdx] || '').replace(/\s\(.*\)$/, '').trim();
         const participantEmail = String(row[emailColIdx] || '').trim().toLowerCase();
         
-        if (archivedClinicNames.has(participantClinicName)) {
+        // Check if this participant should be archived:
+        // 1. Their clinic is in the archive, OR
+        // 2. Their clinic date (parsed from the clinic name) is older than 30 days
+        let shouldArchive = archivedClinicNames.has(participantClinicName);
+        
+        if (!shouldArchive && participantClinicName) {
+          // Try to parse date from clinic name (format: "dag dd maand yyyy HH:MM-HH:MM, Locatie")
+          const clinicDate = parseDutchDateFromClinicName(participantClinicName);
+          if (clinicDate && clinicDate < thirtyDaysAgo) {
+            shouldArchive = true;
+            logMessage(`Clinic "${participantClinicName}" is ouder dan 30 dagen (datum: ${clinicDate.toLocaleDateString('nl-NL')})`);
+          }
+        }
+        
+        if (shouldArchive) {
           const archiveKey = `${participantEmail}|${participantClinicName}`;
           
           // Add to archive if not already there
@@ -369,5 +388,44 @@ function archiveOldClinics(isManualTrigger) {
   } finally {
     logMessage(`----- EINDE ${logPrefix} -----`);
     flushLogs(); // Ensures logs are always saved
+  }
+}
+
+/**
+ * Helper function to parse a Dutch date from a clinic name string.
+ * Expected format: "dag dd maand yyyy HH:MM-HH:MM, Locatie"
+ * Example: "zaterdag 7 december 2025 10:00-13:00, Amsterdam"
+ * @param {string} clinicName - The clinic name to parse
+ * @returns {Date|null} - The parsed date or null if parsing fails
+ */
+function parseDutchDateFromClinicName(clinicName) {
+  if (!clinicName) return null;
+  
+  const monthNamesDutch = {
+    'januari': 0, 'februari': 1, 'maart': 2, 'april': 3, 'mei': 4, 'juni': 5,
+    'juli': 6, 'augustus': 7, 'september': 8, 'oktober': 9, 'november': 10, 'december': 11
+  };
+  
+  try {
+    // Pattern: day-name day month year (e.g., "zaterdag 7 december 2025")
+    const pattern = /(\d{1,2})\s+(januari|februari|maart|april|mei|juni|juli|augustus|september|oktober|november|december)\s+(\d{4})/i;
+    const match = clinicName.match(pattern);
+    
+    if (match) {
+      const day = parseInt(match[1], 10);
+      const month = monthNamesDutch[match[2].toLowerCase()];
+      const year = parseInt(match[3], 10);
+      
+      if (!isNaN(day) && month !== undefined && !isNaN(year)) {
+        const date = new Date(year, month, day);
+        if (!isNaN(date.getTime())) {
+          return date;
+        }
+      }
+    }
+    return null;
+  } catch (e) {
+    Logger.log(`Error parsing date from clinic name "${clinicName}": ${e.message}`);
+    return null;
   }
 }
