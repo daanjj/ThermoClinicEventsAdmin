@@ -297,7 +297,7 @@ function processExcelFile(fileId) {
         if (isNonParticipant) {
           // Non-participant (test/host account): do NOT increment booked seats count
           logMessage(`Non-participant account gedetecteerd (${email}). Deelnemertelling NIET verhoogd.`);
-          participantSequenceNumber = 'NP' + Utilities.formatString('%02d', currentBookedSeats + 1);
+          participantSequenceNumber = 'xx';
         } else {
           // Regular participant: increment the count
           const newBookedSeats = currentBookedSeats + 1;

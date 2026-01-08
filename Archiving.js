@@ -9,6 +9,176 @@ function runDailyArchive() {
   archiveOldClinics(false);
 }
 
+/**
+ * Utility function to retroactively fix participants that were missed during previous archiving runs.
+ * This will:
+ * 1. Find all participants in Open/Besloten sheets whose clinics are already in the archive
+ * 2. Copy missing participants to the archive sheet
+ * 3. Apply strike-through formatting to those rows
+ * Run this manually from the Apps Script editor to fix historical data.
+ */
+function fixMissedArchivedParticipants() {
+  logMessage(`----- START Herstel gemiste gearchiveerde deelnemers -----`);
+  
+  try {
+    const dataClinicsSpreadsheet = SpreadsheetApp.openById(DATA_CLINICS_SPREADSHEET_ID);
+    const responseSs = SpreadsheetApp.getActiveSpreadsheet();
+    
+    // Get archived clinic names from the archive sheet
+    const archiveSheet = dataClinicsSpreadsheet.getSheetByName(ARCHIVE_SHEET_NAME);
+    if (!archiveSheet) {
+      logMessage(`Archief sheet '${ARCHIVE_SHEET_NAME}' niet gevonden. Niets te herstellen.`);
+      SpreadsheetApp.getUi().alert(`Archief sheet '${ARCHIVE_SHEET_NAME}' niet gevonden.`);
+      return;
+    }
+    
+    const archiveData = archiveSheet.getDataRange().getValues();
+    if (archiveData.length < 2) {
+      logMessage(`Geen gearchiveerde clinics gevonden.`);
+      SpreadsheetApp.getUi().alert(`Geen gearchiveerde clinics gevonden.`);
+      return;
+    }
+    
+    // Build set of archived clinic names
+    const archivedClinicNames = new Set();
+    for (let i = 1; i < archiveData.length; i++) {
+      const row = archiveData[i];
+      const dateValue = row[DATE_COLUMN_INDEX - 1];
+      if (!dateValue) continue;
+      const clinicDate = new Date(dateValue);
+      if (isNaN(clinicDate.getTime())) continue;
+      
+      const clinicName = `${getDutchDateString(clinicDate)} ${String(row[TIME_COLUMN_INDEX - 1] || '').trim()}, ${String(row[LOCATION_COLUMN_INDEX - 1] || '').trim()}`;
+      archivedClinicNames.add(clinicName);
+    }
+    
+    logMessage(`${archivedClinicNames.size} gearchiveerde clinics gevonden.`);
+    
+    // Get or create participant archive sheet
+    let participantArchiveSheet = responseSs.getSheetByName(ARCHIVE_PARTICIPANTS_SHEET_NAME);
+    if (!participantArchiveSheet) {
+      participantArchiveSheet = responseSs.insertSheet(ARCHIVE_PARTICIPANTS_SHEET_NAME);
+      logMessage(`Deelnemers archief sheet '${ARCHIVE_PARTICIPANTS_SHEET_NAME}' aangemaakt.`);
+    }
+    
+    // Build set of already archived participants (email + clinic name as key)
+    const alreadyArchivedParticipants = new Set();
+    if (participantArchiveSheet.getLastRow() > 1) {
+      const archiveParticipantData = participantArchiveSheet.getDataRange().getValues();
+      const archiveHeaders = archiveParticipantData[0];
+      const archiveEmailIdx = archiveHeaders.indexOf(FORM_EMAIL_QUESTION_TITLE);
+      const archiveEventIdx = archiveHeaders.indexOf(FORM_EVENT_QUESTION_TITLE);
+      
+      if (archiveEmailIdx !== -1 && archiveEventIdx !== -1) {
+        for (let i = 1; i < archiveParticipantData.length; i++) {
+          const email = String(archiveParticipantData[i][archiveEmailIdx] || '').trim().toLowerCase();
+          const eventName = String(archiveParticipantData[i][archiveEventIdx] || '').replace(/\s\(.*\)$/, '').trim();
+          if (email && eventName) {
+            alreadyArchivedParticipants.add(`${email}|${eventName}`);
+          }
+        }
+      }
+    }
+    
+    logMessage(`${alreadyArchivedParticipants.size} deelnemers al in archief.`);
+    
+    let totalFixed = 0;
+    let totalStrikethrough = 0;
+    let standardHeaders = null;
+    
+    [OPEN_FORM_RESPONSE_SHEET_NAME, BESLOTEN_FORM_RESPONSE_SHEET_NAME].forEach(sheetName => {
+      const responseSheet = responseSs.getSheetByName(sheetName);
+      if (!responseSheet) {
+        logMessage(`WAARSCHUWING: Sheet '${sheetName}' niet gevonden.`);
+        return;
+      }
+      
+      const responseData = responseSheet.getDataRange().getValues();
+      if (responseData.length < 2) return;
+      
+      const responseHeaders = responseData[0];
+      const eventColIdx = responseHeaders.indexOf(FORM_EVENT_QUESTION_TITLE);
+      const emailColIdx = responseHeaders.indexOf(FORM_EMAIL_QUESTION_TITLE);
+      
+      if (eventColIdx === -1 || emailColIdx === -1) {
+        logMessage(`WAARSCHUWING: Vereiste kolommen ontbreken in '${sheetName}'.`);
+        return;
+      }
+      
+      // Set standard headers on first iteration
+      if (!standardHeaders) {
+        standardHeaders = responseHeaders.concat(['Bron Sheet']);
+        if (participantArchiveSheet.getLastRow() === 0) {
+          participantArchiveSheet.getRange(1, 1, 1, standardHeaders.length).setValues([standardHeaders]);
+        }
+      }
+      
+      const participantsToArchive = [];
+      const rowsToStrikeThrough = [];
+      
+      for (let i = 1; i < responseData.length; i++) {
+        const row = responseData[i];
+        const rowNum = i + 1;
+        
+        // Check if already has strike-through
+        const currentFormat = responseSheet.getRange(rowNum, 1).getFontLine();
+        const hasStrikethrough = currentFormat === 'line-through';
+        
+        const participantClinicName = String(row[eventColIdx] || '').replace(/\s\(.*\)$/, '').trim();
+        const participantEmail = String(row[emailColIdx] || '').trim().toLowerCase();
+        
+        if (archivedClinicNames.has(participantClinicName)) {
+          const archiveKey = `${participantEmail}|${participantClinicName}`;
+          
+          // Add to archive if not already there
+          if (!alreadyArchivedParticipants.has(archiveKey)) {
+            const archiveRow = [...row, sheetName];
+            participantsToArchive.push(archiveRow);
+            alreadyArchivedParticipants.add(archiveKey); // Prevent duplicates within same run
+            logMessage(`Toevoegen aan archief: ${participantEmail} van "${participantClinicName}" (${sheetName})`);
+          }
+          
+          // Apply strike-through if not already applied
+          if (!hasStrikethrough) {
+            rowsToStrikeThrough.push(rowNum);
+          }
+        }
+      }
+      
+      // Archive missing participants
+      if (participantsToArchive.length > 0) {
+        const startRow = participantArchiveSheet.getLastRow() + 1;
+        participantArchiveSheet.getRange(startRow, 1, participantsToArchive.length, participantsToArchive[0].length)
+          .setValues(participantsToArchive);
+        totalFixed += participantsToArchive.length;
+        logMessage(`${participantsToArchive.length} ontbrekende deelnemers toegevoegd aan archief vanuit '${sheetName}'.`);
+      }
+      
+      // Apply strike-through to rows that don't have it
+      if (rowsToStrikeThrough.length > 0) {
+        rowsToStrikeThrough.forEach(rowNum => {
+          responseSheet.getRange(rowNum, 1, 1, responseSheet.getLastColumn()).setFontLine('line-through');
+        });
+        totalStrikethrough += rowsToStrikeThrough.length;
+        logMessage(`${rowsToStrikeThrough.length} rijen doorgestreept in '${sheetName}'.`);
+      }
+    });
+    
+    const message = `Herstel voltooid!\n\n${totalFixed} deelnemers toegevoegd aan archief.\n${totalStrikethrough} rijen doorgestreept.`;
+    logMessage(message);
+    SpreadsheetApp.getUi().alert(message);
+    
+  } catch (e) {
+    const errorMessage = `FOUT tijdens herstel: ${e.toString()}\n${e.stack}`;
+    Logger.log(errorMessage);
+    logMessage(errorMessage);
+    SpreadsheetApp.getUi().alert(`Er is een fout opgetreden: ${e.message}`);
+  } finally {
+    logMessage(`----- EINDE Herstel gemiste gearchiveerde deelnemers -----`);
+    flushLogs();
+  }
+}
+
 function archiveOldClinics(isManualTrigger) {
   const logPrefix = isManualTrigger ? "Handmatige archivering" : "Automatische dagelijkse archivering";
   logMessage(`----- START ${logPrefix} -----`);

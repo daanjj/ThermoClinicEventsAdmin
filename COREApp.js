@@ -160,6 +160,9 @@ function sendCoreAppReminder(selectedClinic) {
           finalHtmlBody = finalHtmlBody.replaceAll(placeholder, value);
         }
         
+        // Clean up any double spaces or space before punctuation in subject
+        finalSubject = finalSubject.replace(/\s+([!?.,;:])/g, '$1').replace(/\s+/g, ' ').trim();
+        
         // Construct the final HTML (can be simplified if no complex cleaning is needed)
         const finalHtml = `<!DOCTYPE html>...${finalHtmlBody}...</html>`; // (Your full HTML boilerplate here)
         // =======================================

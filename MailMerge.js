@@ -87,6 +87,9 @@ function mergeSingleTemplate(templateId, placeholderMap) {
     participantBodyHtml = participantBodyHtml.replaceAll(placeholder, value);
     participantSubject = participantSubject.replaceAll(placeholder, value);
   }
+  
+  // Clean up any double spaces or space before punctuation in subject
+  participantSubject = participantSubject.replace(/\s+([!?.,;:])/g, '$1').replace(/\s+/g, ' ').trim();
 
   // 3. Perform final cleaning and formatting
   const finalParagraphs = participantBodyHtml.match(/<(p|h[1-6])[^>]*>[\s\S]*?<\/(p|h[1-6])>/gi) || [];
@@ -264,6 +267,9 @@ function performMailMerge(selectedClinic, selectedTemplateId, selectedTemplateNa
           participantBodyHtml = participantBodyHtml.replaceAll(placeholder, value);
           participantSubject = participantSubject.replaceAll(placeholder, value);
         }
+        
+        // Clean up any double spaces or space before punctuation in subject
+        participantSubject = participantSubject.replace(/\s+([!?.,;:])/g, '$1').replace(/\s+/g, ' ').trim();
 
         const finalParagraphs = participantBodyHtml.match(/<(p|h[1-6])[^>]*>[\s\S]*?<\/(p|h[1-6])>/gi) || [];
         const finalCleanedElements = finalParagraphs.map(p => {
