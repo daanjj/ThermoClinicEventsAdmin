@@ -356,76 +356,103 @@ function syncCalendarEventFromSheet(rowNum) {
   }
   
   if (!dateValue || !location) return;
-  let titleSuffix = !bookedSeats ? `${location} (OPTIE - nog geen deelnemers)` : `${location} (${bookedSeats} ${bookedSeats === 1 ? 'deelnemer' : 'deelnemers'})`;
-  const title = `Thermoclinic op/bij ${titleSuffix}`;
-  const eventDate = new Date(dateValue);
-  const calendar = CalendarApp.getCalendarById(TARGET_CALENDAR_ID);
-  if (!calendar) {
-    Logger.log(`FOUT: Kalender met ID ${TARGET_CALENDAR_ID} niet gevonden.`);
-    logMessage(`FOUT: Kalender met ID ${TARGET_CALENDAR_ID} niet gevonden voor sync. Check configuratie.`);
+  
+  // Use a lock to prevent duplicate calendar event creation from concurrent triggers
+  const lock = LockService.getScriptLock();
+  const lockKey = `calendarSync_row_${rowNum}`;
+  const cache = CacheService.getScriptCache();
+  
+  // Check if this row is already being processed (within last 10 seconds)
+  const isProcessing = cache.get(lockKey);
+  if (isProcessing) {
+    Logger.log(`Row ${rowNum} is already being processed for calendar sync. Skipping to prevent duplicates.`);
     return;
   }
-  let event;
-  if (eventId) {
-    try {
-      event = calendar.getEventById(eventId);
-    } catch (e) {
-      Logger.log(`Could not find event with ID ${eventId}. A new one will be created. Error: ${e.message}`);
-      logMessage(`WAARSCHUWING: Agenda-item met ID ${eventId} niet gevonden. Nieuw item wordt aangemaakt.`);
-    }
+  
+  // Try to acquire lock, wait max 5 seconds
+  if (!lock.tryLock(5000)) {
+    Logger.log(`Could not acquire lock for calendar sync on row ${rowNum}. Skipping.`);
+    return;
   }
-  let startTime, endTime;
-  let isAllDay = false;
-  if (timeValue) {
-    const match = String(timeValue).match(/(\d{1,2})[:.]?(\d{2})?\s*-\s*(\d{1,2})[:.]?(\d{2})?/);
-    if (match) {
-      const startHour = parseInt(match[1], 10);
-      const startMinute = parseInt(match[2], 10) || 0;
-      let endHour = parseInt(match[3], 10);
-      let endMinute = parseInt(match[4], 10) || 0;
-      
-      // Handle cases where start/end times might cross midnight (e.g., 22:00 - 01:00)
-      startTime = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate(), startHour, startMinute, 0);
-      endTime = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate(), endHour, endMinute, 0);
-
-      // If end time is earlier than start time, assume it's on the next day
-      if (endTime < startTime) {
-          endTime.setDate(endTime.getDate() + 1);
+  
+  try {
+    // Mark this row as being processed for 10 seconds
+    cache.put(lockKey, 'processing', 10);
+    
+    let titleSuffix = !bookedSeats ? `${location} (OPTIE - nog geen deelnemers)` : `${location} (${bookedSeats} ${bookedSeats === 1 ? 'deelnemer' : 'deelnemers'})`;
+    const title = `Thermoclinic op/bij ${titleSuffix}`;
+    const eventDate = new Date(dateValue);
+    const calendar = CalendarApp.getCalendarById(TARGET_CALENDAR_ID);
+    if (!calendar) {
+      Logger.log(`FOUT: Kalender met ID ${TARGET_CALENDAR_ID} niet gevonden.`);
+      logMessage(`FOUT: Kalender met ID ${TARGET_CALENDAR_ID} niet gevonden voor sync. Check configuratie.`);
+      return;
+    }
+    let event;
+    if (eventId) {
+      try {
+        event = calendar.getEventById(eventId);
+      } catch (e) {
+        Logger.log(`Could not find event with ID ${eventId}. A new one will be created. Error: ${e.message}`);
+        logMessage(`WAARSCHUWING: Agenda-item met ID ${eventId} niet gevonden. Nieuw item wordt aangemaakt.`);
       }
+    }
+    let startTime, endTime;
+    let isAllDay = false;
+    if (timeValue) {
+      const match = String(timeValue).match(/(\d{1,2})[:.]?(\d{2})?\s*-\s*(\d{1,2})[:.]?(\d{2})?/);
+      if (match) {
+        const startHour = parseInt(match[1], 10);
+        const startMinute = parseInt(match[2], 10) || 0;
+        let endHour = parseInt(match[3], 10);
+        let endMinute = parseInt(match[4], 10) || 0;
+        
+        // Handle cases where start/end times might cross midnight (e.g., 22:00 - 01:00)
+        startTime = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate(), startHour, startMinute, 0);
+        endTime = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate(), endHour, endMinute, 0);
 
-    } else {
-      // If time format doesn't match HH:MM - HH:MM, try HH:MM
-      const singleTimeMatch = String(timeValue).match(/(\d{1,2})[:.]?(\d{2})/);
-      if(singleTimeMatch) {
-          const hour = parseInt(singleTimeMatch[1], 10);
-          const minute = parseInt(singleTimeMatch[2], 10) || 0;
-          startTime = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate(), hour, minute, 0);
-          endTime = new Date(startTime.getTime() + DEFAULT_EVENT_DURATION_HOURS * 60 * 60 * 1000); // Default duration
+        // If end time is earlier than start time, assume it's on the next day
+        if (endTime < startTime) {
+            endTime.setDate(endTime.getDate() + 1);
+        }
+
       } else {
-          isAllDay = true; // Fallback to all-day if no time can be parsed
+        // If time format doesn't match HH:MM - HH:MM, try HH:MM
+        const singleTimeMatch = String(timeValue).match(/(\d{1,2})[:.]?(\d{2})/);
+        if(singleTimeMatch) {
+            const hour = parseInt(singleTimeMatch[1], 10);
+            const minute = parseInt(singleTimeMatch[2], 10) || 0;
+            startTime = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate(), hour, minute, 0);
+            endTime = new Date(startTime.getTime() + DEFAULT_EVENT_DURATION_HOURS * 60 * 60 * 1000); // Default duration
+        } else {
+            isAllDay = true; // Fallback to all-day if no time can be parsed
+        }
       }
-    }
-  } else {
-    isAllDay = true;
-  }
-  const eventOptions = {
-    location: location
-  };
-  if (event) {
-    event.setTitle(title);
-    event.setLocation(location);
-    if (isAllDay) {
-      event.setAllDayDate(eventDate);
     } else {
-      event.setTime(startTime, endTime);
+      isAllDay = true;
     }
-    Logger.log(`Updated calendar event for "${location}" on row ${rowNum}.`);
-    logMessage(`Agenda-item bijgewerkt voor "${title}" op rij ${rowNum}.`);
-  } else {
-    let newEvent = isAllDay ? calendar.createAllDayEvent(title, eventDate, eventOptions) : calendar.createEvent(title, startTime, endTime, eventOptions);
-    sheet.getRange(rowNum, headerMap[CALENDAR_EVENT_ID_HEADER] + 1).setValue(newEvent.getId());
-    Logger.log(`Created new calendar event for "${location}" on row ${rowNum}.`);
-    logMessage(`Nieuw agenda-item aangemaakt voor "${title}" op rij ${rowNum}. ID: ${newEvent.getId()}`);
+    const eventOptions = {
+      location: location
+    };
+    if (event) {
+      event.setTitle(title);
+      event.setLocation(location);
+      if (isAllDay) {
+        event.setAllDayDate(eventDate);
+      } else {
+        event.setTime(startTime, endTime);
+      }
+      Logger.log(`Updated calendar event for "${location}" on row ${rowNum}.`);
+      logMessage(`Agenda-item bijgewerkt voor "${title}" op rij ${rowNum}.`);
+    } else {
+      let newEvent = isAllDay ? calendar.createAllDayEvent(title, eventDate, eventOptions) : calendar.createEvent(title, startTime, endTime, eventOptions);
+      sheet.getRange(rowNum, headerMap[CALENDAR_EVENT_ID_HEADER] + 1).setValue(newEvent.getId());
+      Logger.log(`Created new calendar event for "${location}" on row ${rowNum}.`);
+      logMessage(`Nieuw agenda-item aangemaakt voor "${title}" op rij ${rowNum}. ID: ${newEvent.getId()}`);
+    }
+  } finally {
+    // Always release the lock
+    lock.releaseLock();
   }
 }
 

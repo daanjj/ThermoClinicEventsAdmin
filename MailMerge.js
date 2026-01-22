@@ -4,6 +4,30 @@
 // including showing the dialog, retrieving data, merging templates, and sending emails.
 
 function showMailMergeDialog() {
+  // Check Gmail alias before showing dialog - we can show UI alerts here (menu context)
+  const desiredAlias = EMAIL_SENDER_ALIAS;
+  const availableAliases = GmailApp.getAliases();
+  
+  if (!availableAliases.includes(desiredAlias)) {
+    const currentUser = Session.getActiveUser().getEmail() || Session.getEffectiveUser().getEmail() || 'onbekend';
+    const ui = SpreadsheetApp.getUi();
+    const response = ui.alert(
+      'Verkeerd account',
+      `Let op: Email alias "${desiredAlias}" niet gevonden.\n\n` +
+      `Je bent ingelogd als: ${currentUser}\n` +
+      `Voor correcte afzender moet je inloggen als: joost@thermoclinics.nl\n\n` +
+      `Als je doorgaat worden de mails verstuurd vanuit ${currentUser}.\n\n` +
+      `Wil je doorgaan?`,
+      ui.ButtonSet.YES_NO
+    );
+    
+    if (response !== ui.Button.YES) {
+      logMessage(`Mail merge geannuleerd door gebruiker. Ingelogd als ${currentUser}, alias ${desiredAlias} niet beschikbaar.`);
+      return;
+    }
+    logMessage(`WAARSCHUWING: Gebruiker ${currentUser} gaat door met mail merge zonder alias ${desiredAlias}.`);
+  }
+  
   const htmlTemplate = HtmlService.createTemplateFromFile('MailMergeDialog');
   htmlTemplate.clinics = getAvailableClinicsList();
   htmlTemplate.templates = getMailTemplates();
@@ -124,57 +148,15 @@ function performMailMerge(selectedClinic, selectedTemplateId, selectedTemplateNa
   const logHeader = `----- START mailmerge voor ${selectedClinic} met sjabloon ${selectedTemplateName} -----`;
   logMessage(logHeader);
   
-  // Check if the correct Google user is active
-  const expectedEmail = "infothermoclinics@gmail.com";
-  let activeUserEmail;
-  
-  try {
-    activeUserEmail = Session.getEffectiveUser().getEmail();
-  } catch (permissionError) {
-    // This error occurs when the user hasn't granted the userinfo.email permission,
-    // or when they switched accounts in the browser without re-authorizing
-    const ui = SpreadsheetApp.getUi();
-    ui.alert(
-      'Autorisatie vereist',
-      'U heeft nog niet alle benodigde rechten toegekend, of u heeft van Google-account gewisseld.\n\n' +
-      '⚠️ BELANGRIJKE OPLOSSING:\n' +
-      '1. Open een NIEUW INCOGNITO/PRIVÉ VENSTER (Ctrl+Shift+N of Cmd+Shift+N)\n' +
-      '2. Log in met ALLEEN het account: ' + expectedEmail + '\n' +
-      '3. Open het spreadsheet opnieuw in dat incognito venster\n' +
-      '4. Ga naar "Thermoclinics Tools" → "Check of alle permissies zijn toegekend"\n' +
-      '5. Keur alle rechten goed\n' +
-      '6. Probeer daarna de mailmerge opnieuw\n\n' +
-      '💡 TIP: Werk ALTIJD in een incognito venster met alleen ' + expectedEmail + ' ingelogd om redirect-fouten te voorkomen.\n\n' +
-      'Technische details: ' + permissionError.message,
-      ui.ButtonSet.OK
-    );
-    logMessage(`Mailmerge mislukt: Geen toegang tot gebruikersinfo. Fout: ${permissionError.message}`);
-    return;
-  }
-  
-  if (activeUserEmail !== expectedEmail) {
-    const ui = SpreadsheetApp.getUi();
-    const response = ui.alert(
-      'Verkeerd account',
-      `LET OP: mailmerge dient vanuit user ${expectedEmail} gedaan te worden en niet vanuit ${activeUserEmail}. Weet u zeker dat u door wilt gaan? Mails zullen uit uw naam worden verzonden en niet vanuit info@thermoclinics.nl!`,
-      ui.ButtonSet.YES_NO
-    );
-    
-    if (response === ui.Button.NO) {
-      logMessage(`Mailmerge geannuleerd: verkeerd Google account (${activeUserEmail} in plaats van ${expectedEmail}).`);
-      return;
-    } else {
-      logMessage(`WAARSCHUWING: Mailmerge uitgevoerd vanuit ${activeUserEmail} in plaats van ${expectedEmail}.`);
-    }
-  }
-  
-  // Verify Gmail alias is available
-  const desiredAlias = "info@thermoclinics.nl";
+  // Verify Gmail alias is available - script should run under joost@thermoclinics.nl
+  // Note: Cannot show UI dialogs when called from HTML dialog, so we log warning and proceed
+  const desiredAlias = EMAIL_SENDER_ALIAS;
   const availableAliases = GmailApp.getAliases();
-  const fromAlias = availableAliases.includes(desiredAlias) ? desiredAlias : null;
+  let fromAlias = availableAliases.includes(desiredAlias) ? desiredAlias : null;
   
   if (!fromAlias) {
-    logMessage(`WAARSCHUWING: Alias "${desiredAlias}" niet gevonden. Beschikbare aliassen: ${availableAliases.join(', ')}. Emails worden verstuurd zonder 'from' alias.`);
+    const currentUser = Session.getActiveUser().getEmail() || Session.getEffectiveUser().getEmail() || 'onbekend';
+    logMessage(`WAARSCHUWING: Email alias "${desiredAlias}" niet gevonden. Ingelogd als ${currentUser}. Voor correcte afzender moet je inloggen als joost@thermoclinics.nl. Emails worden verstuurd vanuit ${currentUser}.`);
   }
 
   try {
@@ -210,8 +192,7 @@ function performMailMerge(selectedClinic, selectedTemplateId, selectedTemplateNa
 
     if (participantsWithIndex.length === 0) {
       logMessage(`Geen deelnemers gevonden voor de clinic: "${selectedClinic}".`);
-      SpreadsheetApp.getUi().alert(`Geen deelnemers gevonden voor de clinic: "${selectedClinic}".`);
-      return;
+      throw new Error(`Geen deelnemers gevonden voor de clinic: "${selectedClinic}".`);
     }
 
     const preparedTemplate = prepareMailTemplate(selectedTemplateId);
@@ -393,12 +374,12 @@ function performMailMerge(selectedClinic, selectedTemplateId, selectedTemplateNa
     
     const successMessage = `Mail merge voltooid! ${sentCount} mail(s) verstuurd.`;
     logMessage(`----- EINDE mailmerge: ${sentCount} mail(s) verstuurd -----`);
-    SpreadsheetApp.getUi().alert(successMessage);
+    return successMessage; // Return success message for HTML dialog to display
 
   } catch (err) {
     Logger.log(`performMailMerge FATAL ERROR: ${err.toString()}\n${err.stack}`);
     logMessage(`Mailmerge FATALE FOUT: ${err.message}`);
-    SpreadsheetApp.getUi().alert(`Er is een fatale fout opgetreden: ${err.message}`);
+    throw err; // Re-throw for HTML dialog to handle
   } finally {
     flushLogs();
   }

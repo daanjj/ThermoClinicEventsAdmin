@@ -4,13 +4,15 @@
 // from the open and besloten forms.
 
 function processBooking(e) {
-  // Verify Gmail alias is available
-  const desiredAlias = "info@thermoclinics.nl";
+  // Verify Gmail alias is available - script should run under joost@thermoclinics.nl
+  // Note: Cannot show UI dialogs in form submit triggers, so we log warning and proceed
+  const desiredAlias = EMAIL_SENDER_ALIAS;
   const availableAliases = GmailApp.getAliases();
-  const fromAlias = availableAliases.includes(desiredAlias) ? desiredAlias : null;
+  let fromAlias = availableAliases.includes(desiredAlias) ? desiredAlias : null;
   
   if (!fromAlias) {
-    logMessage(`WAARSCHUWING: Alias "${desiredAlias}" niet gevonden voor bevestigingsmail. Beschikbare aliassen: ${availableAliases.join(', ')}. Email wordt verstuurd zonder 'from' alias.`);
+    const currentUser = Session.getActiveUser().getEmail() || Session.getEffectiveUser().getEmail() || 'onbekend';
+    logMessage(`WAARSCHUWING: Email alias "${desiredAlias}" niet gevonden. Ingelogd als ${currentUser}. Voor correcte afzender moet je inloggen als joost@thermoclinics.nl. Emails worden verstuurd vanuit ${currentUser}.`);
   }
   try {
     if (!e || !e.namedValues) {

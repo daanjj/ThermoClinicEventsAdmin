@@ -185,7 +185,14 @@
       }
 
       function onSuccess(message) {
-        google.script.host.close();
+        var statusDiv = document.getElementById('status');
+        var loader = document.getElementById('loader');
+        loader.style.display = 'none';
+        statusDiv.innerHTML = '<strong style="color: green;">' + (message || 'Mail merge voltooid!') + '</strong>';
+        // Close dialog after 2 seconds
+        setTimeout(function() {
+          google.script.host.close();
+        }, 2000);
       }
 
       function onFailure(error) {

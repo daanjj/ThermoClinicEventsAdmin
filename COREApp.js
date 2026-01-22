@@ -2,6 +2,30 @@
 // including reminders and updating CORE app email addresses in the response sheets.
 
 function showCoreReminderDialog() {
+  // Check Gmail alias before showing dialog - we can show UI alerts here (menu context)
+  const desiredAlias = EMAIL_SENDER_ALIAS;
+  const availableAliases = GmailApp.getAliases();
+  
+  if (!availableAliases.includes(desiredAlias)) {
+    const currentUser = Session.getActiveUser().getEmail() || Session.getEffectiveUser().getEmail() || 'onbekend';
+    const ui = SpreadsheetApp.getUi();
+    const response = ui.alert(
+      'Verkeerd account',
+      `Let op: Email alias "${desiredAlias}" niet gevonden.\n\n` +
+      `Je bent ingelogd als: ${currentUser}\n` +
+      `Voor correcte afzender moet je inloggen als: joost@thermoclinics.nl\n\n` +
+      `Als je doorgaat worden de mails verstuurd vanuit ${currentUser}.\n\n` +
+      `Wil je doorgaan?`,
+      ui.ButtonSet.YES_NO
+    );
+    
+    if (response !== ui.Button.YES) {
+      logMessage(`CORE reminder geannuleerd door gebruiker. Ingelogd als ${currentUser}, alias ${desiredAlias} niet beschikbaar.`);
+      return;
+    }
+    logMessage(`WAARSCHUWING: Gebruiker ${currentUser} gaat door met CORE reminder zonder alias ${desiredAlias}.`);
+  }
+  
   const clinics = getClinicsForReminder();
   const htmlTemplate = HtmlService.createTemplateFromFile('COREReminderDialog');
   htmlTemplate.clinics = clinics;
@@ -72,13 +96,15 @@ function sendCoreAppReminder(selectedClinic) {
   const logHeader = `----- START CORE-app reminder voor ${selectedClinic} -----`;
   logMessage(logHeader);
   
-  // Verify Gmail alias is available
-  const desiredAlias = "info@thermoclinics.nl";
+  // Verify Gmail alias is available - script should run under joost@thermoclinics.nl
+  // Note: Cannot show UI dialogs when called from HTML dialog, so we log warning and proceed
+  const desiredAlias = EMAIL_SENDER_ALIAS;
   const availableAliases = GmailApp.getAliases();
-  const fromAlias = availableAliases.includes(desiredAlias) ? desiredAlias : null;
+  let fromAlias = availableAliases.includes(desiredAlias) ? desiredAlias : null;
   
   if (!fromAlias) {
-    logMessage(`WAARSCHUWING: Alias "${desiredAlias}" niet gevonden voor CORE reminder. Beschikbare aliassen: ${availableAliases.join(', ')}. Emails worden verstuurd zonder 'from' alias.`);
+    const currentUser = Session.getActiveUser().getEmail() || Session.getEffectiveUser().getEmail() || 'onbekend';
+    logMessage(`WAARSCHUWING: Email alias "${desiredAlias}" niet gevonden. Ingelogd als ${currentUser}. Voor correcte afzender moet je inloggen als joost@thermoclinics.nl. Emails worden verstuurd vanuit ${currentUser}.`);
   }
 
   try {
@@ -114,8 +140,7 @@ function sendCoreAppReminder(selectedClinic) {
 
     if (participantsToRemind.length === 0) {
       logMessage(`Geen deelnemers gevonden voor clinic "${selectedClinic}" die een reminder nodig hebben.`);
-      SpreadsheetApp.getUi().alert(`Alle deelnemers voor deze clinic hebben al een CORE-mailadres ingevuld.`);
-      return;
+      throw new Error(`Alle deelnemers voor deze clinic hebben al een CORE-mailadres ingevuld.`);
     }
 
     // ===== OPTIMIZATION CHANGE IS HERE =====
@@ -187,12 +212,12 @@ function sendCoreAppReminder(selectedClinic) {
     const mailText = (sentCount === 1) ? 'reminder' : 'reminders';
     const successMessage = `Versturen voltooid! ${sentCount} ${mailText} verstuurd.`;
     logMessage(`----- EINDE CORE-app reminder: ${sentCount} ${mailText} verstuurd -----`);
-    SpreadsheetApp.getUi().alert(successMessage);
+    return successMessage; // Return success message for HTML dialog to display
 
   } catch (err) {
     Logger.log(`sendCoreAppReminder CRITICAL ERROR: ${err.toString()}\n${err.stack}`);
     logMessage(`CORE-app reminder FOUT: ${err.message}`);
-    SpreadsheetApp.getUi().alert(`Er is een fout opgetreden: ${err.message}`);
+    throw err; // Re-throw for HTML dialog to handle
   } finally {
     flushLogs();
   }

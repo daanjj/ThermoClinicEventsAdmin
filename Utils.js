@@ -88,6 +88,72 @@ function updateEventFolderIDs() {
 }
 
 /**
+ * UTILITY FUNCTION: Recreates all calendar events for clinics in the Data Clinics sheet.
+ * This is useful when switching to a new calendar. Before running:
+ * 1. Clear the "Calendar Event ID" column in the Data Clinics sheet
+ * 2. Delete old events from the old calendar manually
+ * 3. Run this function to create new events in the current TARGET_CALENDAR_ID
+ */
+function recreateAllCalendarEvents() {
+  const ui = SpreadsheetApp.getUi();
+  const response = ui.alert(
+    'Calendar Events Opnieuw Aanmaken',
+    'Dit zal voor ALLE clinics in de Data Clinics sheet een nieuw calendar event aanmaken.\n\n' +
+    'Zorg eerst dat je:\n' +
+    '1. De "Calendar Event ID" kolom hebt leeggemaakt\n' +
+    '2. Oude events handmatig hebt verwijderd uit de oude kalender\n\n' +
+    'Wil je doorgaan?',
+    ui.ButtonSet.YES_NO
+  );
+  
+  if (response !== ui.Button.YES) {
+    ui.alert('Actie geannuleerd.');
+    return;
+  }
+  
+  logMessage('----- START Utility: recreateAllCalendarEvents -----');
+  
+  try {
+    const dataClinicsSpreadsheet = SpreadsheetApp.openById(DATA_CLINICS_SPREADSHEET_ID);
+    const sheet = dataClinicsSpreadsheet.getSheetByName(DATA_CLINICS_SHEET_NAME);
+    if (!sheet) {
+      throw new Error(`Sheet '${DATA_CLINICS_SHEET_NAME}' niet gevonden.`);
+    }
+    
+    const lastRow = sheet.getLastRow();
+    if (lastRow < DATA_CLINICS_START_ROW) {
+      ui.alert('Geen clinics gevonden in de sheet.');
+      return;
+    }
+    
+    let createdCount = 0;
+    let skippedCount = 0;
+    
+    for (let row = DATA_CLINICS_START_ROW; row <= lastRow; row++) {
+      try {
+        syncCalendarEventFromSheet(row);
+        createdCount++;
+        logMessage(`Calendar event gesynchroniseerd voor rij ${row}`);
+      } catch (e) {
+        skippedCount++;
+        logMessage(`WAARSCHUWING: Kon calendar event niet maken voor rij ${row}: ${e.message}`);
+      }
+    }
+    
+    const resultMessage = `Klaar! ${createdCount} calendar event(s) aangemaakt/bijgewerkt, ${skippedCount} overgeslagen.`;
+    logMessage(resultMessage);
+    logMessage('----- EINDE Utility: recreateAllCalendarEvents -----');
+    ui.alert('Voltooid', resultMessage, ui.ButtonSet.OK);
+    
+  } catch (err) {
+    logMessage(`recreateAllCalendarEvents FOUT: ${err.message}`);
+    ui.alert('Fout', `Er is een fout opgetreden: ${err.message}`, ui.ButtonSet.OK);
+  } finally {
+    flushLogs();
+  }
+}
+
+/**
  * This function is designed to be run by a user from the menu.
  * Its primary purpose is to trigger the Google Apps Script authorization flow,
  * requesting all necessary permissions at once. It also provides feedback to the user.

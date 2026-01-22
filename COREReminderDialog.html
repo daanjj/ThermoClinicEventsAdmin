@@ -73,10 +73,15 @@
           .sendCoreAppReminder(selectedClinic);
       }
 
-      function onSuccess() {
-        // The server-side function shows an alert with the result.
-        // We just need to close the dialog.
-        google.script.host.close();
+      function onSuccess(message) {
+        var statusDiv = document.getElementById('status');
+        var loader = document.getElementById('loader');
+        loader.style.display = 'none';
+        statusDiv.innerHTML = '<strong style="color: green;">' + (message || 'Reminders verstuurd!') + '</strong>';
+        // Close dialog after 2 seconds
+        setTimeout(function() {
+          google.script.host.close();
+        }, 2000);
       }
 
       function onFailure(error) {

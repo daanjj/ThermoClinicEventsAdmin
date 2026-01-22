@@ -10,13 +10,14 @@ const DATA_CLINICS_SPREADSHEET_ID = '15JjYK3O4k9IKFNxocC43D1ZhiH5g0Fd36ULRCfkLNE
 const DATA_CLINICS_SHEET_NAME = 'Data clinics';
 const QUESTION_TITLE_TO_UPDATE = 'Datum, tijdstip en locatie waarop je wilt deelnemen';
 const CORE_APP_QUESTION_TITLE = 'Voor welke clinic heb je je opgegeven?'; // Specific title for the 3rd form
-const PARENT_EVENT_FOLDER_ID = '11cNspj1CPYmUN7MUunHgg6Pv2QyhCwIT';
+const PARENT_EVENT_FOLDER_ID = '1rMPdE3k-5Sc-P2X3SbgRClUX8HHg-7Gt';
 const CONFIRMATION_EMAIL_TEMPLATE_ID = '1MaoY-S2FgsajUv6Vp9a_s8TXjql7lka95t9DNvQy21k'; // Legacy template - kept for backward compatibility
 const OPEN_CONFIRMATION_EMAIL_TEMPLATE_ID = '1MaoY-S2FgsajUv6Vp9a_s8TXjql7lka95t9DNvQy21k'; // Template for Open clinic confirmations
 const BESLOTEN_CONFIRMATION_EMAIL_TEMPLATE_ID = '1MaoY-S2FgsajUv6Vp9a_s8TXjql7lka95t9DNvQy21k'; // Template for Besloten clinic confirmations (TODO: Update with actual template ID)
 const CORE_APP_REMINDER_TEMPLATE_ID = '10CVavxSJnjg72LjTtMKaRnI4xN_KIrbbK8mp_QX94PE'; // Added constant for reminder template
 const FALLBACK_EMAIL_SENDER_NAME = 'Thermoclinics';
-const TARGET_CALENDAR_ID = 'c37540c489700aad336b5d9b240759b5c8b26b4473d6f4641a938b38be6344b0@group.calendar.google.com';
+const EMAIL_SENDER_ALIAS = 'info@thermoclinics.nl'; // Gmail alias used for sending all emails (configured on joost@thermoclinics.nl)
+const TARGET_CALENDAR_ID = 'c_9622b6f091ccc4762a344a9c61a8153cc1c61026a765e69c401a3a25a14f043b@group.calendar.google.com'; // Updated to joost@thermoclinics.nl
 const DEFAULT_EVENT_DURATION_HOURS = 3;
 
 // --- CONFIGURATION FOR MAIL MERGE & RESPONSE SHEETS ---

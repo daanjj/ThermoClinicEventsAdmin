@@ -12,6 +12,7 @@ function onOpen() {
     .addItem('Archiveer oudere clinics', 'runManualArchive')
     .addSeparator()
     .addItem('Update pop-ups voor alle formulieren', 'updateAllFormDropdowns')
+    .addItem('Herstel alle agenda-items', 'recreateAllCalendarEvents')
     .addItem('Check of alle permissies zijn toegekend', 'forceAuthorization')
     .addToUi();
   
