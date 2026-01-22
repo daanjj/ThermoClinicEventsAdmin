@@ -10,6 +10,200 @@ function runDailyArchive() {
 }
 
 /**
+ * Menu function to ensure all strikethrough participants are properly archived.
+ * This function:
+ * 1. Asks if already-archived strikethrough participants should be deleted
+ * 2. Loops through all rows in Open and Besloten response sheets
+ * 3. For each strikethrough row, checks if it exists in 'ARCHIEF deelnemers'
+ * 4. If not present, adds the participant to the archive
+ * 5. If already present and user chose to delete, removes the row from the source sheet
+ * 6. Shows a summary dialog at the end
+ */
+function archiveStrikethroughParticipants() {
+  logMessage(`----- START Archiveer doorgestreepte deelnemers -----`);
+  
+  const ui = SpreadsheetApp.getUi();
+  
+  // Ask user if they want to delete strikethrough rows that are already archived
+  // Default is NO (don't delete) - require explicit confirmation for delete
+  let shouldDelete = false;
+  
+  const deleteResponse = ui.alert(
+    'Doorgestreepte deelnemers verwijderen?',
+    'Wil je doorgestreepte deelnemers die al in het archief staan VERWIJDEREN uit de bron-sheets?\n\n' +
+    'Klik CANCEL / ANNULEREN om alleen te archiveren zonder te verwijderen (aanbevolen).\n' +
+    'Klik OK om te verwijderen.',
+    ui.ButtonSet.OK_CANCEL
+  );
+  
+  if (deleteResponse === ui.Button.OK) {
+    // Extra confirmation for destructive action
+    const confirmDelete = ui.alert(
+      '⚠️ Bevestig verwijderen',
+      'Weet je zeker dat je alle doorgestreepte rijen die al gearchiveerd zijn wilt VERWIJDEREN?\n\n' +
+      'Dit kan niet ongedaan worden gemaakt!',
+      ui.ButtonSet.YES_NO
+    );
+    shouldDelete = (confirmDelete === ui.Button.YES);
+  }
+  
+  logMessage(`Gebruiker koos: ${shouldDelete ? 'WEL verwijderen' : 'NIET verwijderen'} van reeds gearchiveerde doorgestreepte deelnemers.`);
+  
+  try {
+    const responseSs = SpreadsheetApp.getActiveSpreadsheet();
+    
+    // Get or create participant archive sheet
+    let participantArchiveSheet = responseSs.getSheetByName(ARCHIVE_PARTICIPANTS_SHEET_NAME);
+    if (!participantArchiveSheet) {
+      participantArchiveSheet = responseSs.insertSheet(ARCHIVE_PARTICIPANTS_SHEET_NAME);
+      logMessage(`Deelnemers archief sheet '${ARCHIVE_PARTICIPANTS_SHEET_NAME}' aangemaakt.`);
+    }
+    
+    // Build set of already archived participants (normalized email + clinic name as key)
+    const alreadyArchivedParticipants = new Set();
+    let archiveEmailIdx = -1;
+    let archiveEventIdx = -1;
+    
+    if (participantArchiveSheet.getLastRow() > 1) {
+      const archiveParticipantData = participantArchiveSheet.getDataRange().getValues();
+      const archiveHeaders = archiveParticipantData[0];
+      archiveEmailIdx = archiveHeaders.indexOf(FORM_EMAIL_QUESTION_TITLE);
+      archiveEventIdx = archiveHeaders.indexOf(FORM_EVENT_QUESTION_TITLE);
+      
+      if (archiveEmailIdx !== -1 && archiveEventIdx !== -1) {
+        for (let i = 1; i < archiveParticipantData.length; i++) {
+          const email = String(archiveParticipantData[i][archiveEmailIdx] || '').trim().toLowerCase();
+          const eventName = normalizeClinicName(String(archiveParticipantData[i][archiveEventIdx] || '').replace(/\s\(.*\)$/, ''));
+          if (email && eventName) {
+            alreadyArchivedParticipants.add(`${email}|${eventName}`);
+          }
+        }
+      }
+    }
+    
+    logMessage(`${alreadyArchivedParticipants.size} deelnemers al in archief.`);
+    
+    let totalAdded = 0;
+    let totalAlreadyArchived = 0;
+    let totalDeleted = 0;
+    let standardHeaders = null;
+    
+    [OPEN_FORM_RESPONSE_SHEET_NAME, BESLOTEN_FORM_RESPONSE_SHEET_NAME].forEach(sheetName => {
+      const responseSheet = responseSs.getSheetByName(sheetName);
+      if (!responseSheet) {
+        logMessage(`WAARSCHUWING: Sheet '${sheetName}' niet gevonden.`);
+        return;
+      }
+      
+      const responseData = responseSheet.getDataRange().getValues();
+      if (responseData.length < 2) return;
+      
+      const responseHeaders = responseData[0];
+      const eventColIdx = responseHeaders.indexOf(FORM_EVENT_QUESTION_TITLE);
+      const emailColIdx = responseHeaders.indexOf(FORM_EMAIL_QUESTION_TITLE);
+      
+      if (eventColIdx === -1 || emailColIdx === -1) {
+        logMessage(`WAARSCHUWING: Vereiste kolommen ontbreken in '${sheetName}'.`);
+        return;
+      }
+      
+      // Set standard headers on first iteration
+      if (!standardHeaders) {
+        standardHeaders = responseHeaders.concat(['Bron Sheet']);
+        if (participantArchiveSheet.getLastRow() === 0) {
+          participantArchiveSheet.getRange(1, 1, 1, standardHeaders.length).setValues([standardHeaders]);
+          logMessage(`Archief headers ingesteld.`);
+        }
+      }
+      
+      const participantsToArchive = [];
+      const rowsToDelete = []; // Store row numbers to delete (in reverse order later)
+      let sheetAlreadyArchived = 0;
+      
+      // Loop through all rows and check for strikethrough
+      for (let i = 1; i < responseData.length; i++) {
+        const rowNum = i + 1;
+        const row = responseData[i];
+        
+        // Check if row has strikethrough formatting
+        const fontLine = responseSheet.getRange(rowNum, 1).getFontLine();
+        if (fontLine !== 'line-through') {
+          continue; // Skip non-strikethrough rows
+        }
+        
+        const rawClinicName = String(row[eventColIdx] || '').replace(/\s\(.*\)$/, '').trim();
+        const normalizedClinicName = normalizeClinicName(rawClinicName);
+        const email = String(row[emailColIdx] || '').trim().toLowerCase();
+        
+        const archiveKey = `${email}|${normalizedClinicName}`;
+        
+        if (alreadyArchivedParticipants.has(archiveKey)) {
+          sheetAlreadyArchived++;
+          if (shouldDelete) {
+            rowsToDelete.push(rowNum);
+            logMessage(`Markeren voor verwijdering: ${email} van "${rawClinicName}" (${sheetName}) - staat al in archief`);
+          }
+          continue; // Already in archive
+        }
+        
+        // Add to archive
+        const archiveRow = [...row, sheetName];
+        participantsToArchive.push(archiveRow);
+        alreadyArchivedParticipants.add(archiveKey); // Prevent duplicates within same run
+        logMessage(`Toevoegen aan archief: ${email} van "${rawClinicName}" (${sheetName})`);
+      }
+      
+      // Write to archive sheet
+      if (participantsToArchive.length > 0) {
+        const startRow = participantArchiveSheet.getLastRow() + 1;
+        participantArchiveSheet.getRange(startRow, 1, participantsToArchive.length, participantsToArchive[0].length)
+          .setValues(participantsToArchive);
+        
+        SpreadsheetApp.flush();
+        
+        totalAdded += participantsToArchive.length;
+        logMessage(`${participantsToArchive.length} doorgestreepte deelnemers toegevoegd aan archief vanuit '${sheetName}'.`);
+      }
+      
+      // Delete rows if user chose to do so (delete from bottom to top to preserve row numbers)
+      if (rowsToDelete.length > 0) {
+        rowsToDelete.sort((a, b) => b - a); // Sort descending
+        rowsToDelete.forEach(rowNum => {
+          responseSheet.deleteRow(rowNum);
+        });
+        totalDeleted += rowsToDelete.length;
+        logMessage(`${rowsToDelete.length} doorgestreepte rijen verwijderd uit '${sheetName}'.`);
+      }
+      
+      totalAlreadyArchived += sheetAlreadyArchived;
+      if (sheetAlreadyArchived > 0) {
+        logMessage(`${sheetAlreadyArchived} doorgestreepte deelnemers in '${sheetName}' stonden al in archief.`);
+      }
+    });
+    
+    let message = `Archivering voltooid!\n\n` +
+                  `${totalAdded} doorgestreepte deelnemers toegevoegd aan '${ARCHIVE_PARTICIPANTS_SHEET_NAME}'.\n` +
+                  `${totalAlreadyArchived} doorgestreepte deelnemers stonden al in archief.`;
+    
+    if (shouldDelete && totalDeleted > 0) {
+      message += `\n${totalDeleted} doorgestreepte rijen verwijderd uit bron-sheets.`;
+    }
+    
+    logMessage(message.replace(/\n/g, ' '));
+    ui.alert('Archivering doorgestreepte deelnemers', message, ui.ButtonSet.OK);
+    
+  } catch (e) {
+    const errorMessage = `FOUT tijdens archiveren doorgestreepte deelnemers: ${e.toString()}\n${e.stack}`;
+    Logger.log(errorMessage);
+    logMessage(errorMessage);
+    ui.alert('Fout', `Er is een fout opgetreden: ${e.message}`, ui.ButtonSet.OK);
+  } finally {
+    logMessage(`----- EINDE Archiveer doorgestreepte deelnemers -----`);
+    flushLogs();
+  }
+}
+
+/**
  * Utility function to retroactively fix participants that were missed during previous archiving runs.
  * This will:
  * 1. Find all participants in Open/Besloten sheets whose clinics are already in the archive

@@ -10,32 +10,38 @@ function onOpen() {
     .addItem('Maak deelnemerslijst', 'showParticipantListDialog') 
     .addSeparator()
     .addItem('Archiveer oudere clinics', 'runManualArchive')
+    .addItem('Archiveer doorgestreepte deelnemers', 'archiveStrikethroughParticipants')
     .addSeparator()
     .addItem('Update pop-ups voor alle formulieren', 'updateAllFormDropdowns')
     .addItem('Herstel alle agenda-items', 'recreateAllCalendarEvents')
     .addItem('Check of alle permissies zijn toegekend', 'forceAuthorization')
     .addToUi();
   
-  // Check if user is logged in with the correct account and show warning if not
+  // Check if the correct Gmail alias is available (indicates correct account)
   try {
-    const expectedEmail = "infothermoclinics@gmail.com";
-    const activeUserEmail = Session.getEffectiveUser().getEmail();
+    const desiredAlias = EMAIL_SENDER_ALIAS;
+    const availableAliases = GmailApp.getAliases();
     
-    if (activeUserEmail !== expectedEmail) {
+    if (!availableAliases.includes(desiredAlias)) {
+      const currentUser = Session.getActiveUser().getEmail() || Session.getEffectiveUser().getEmail() || 'onbekend';
       // Show a one-time warning toast (non-intrusive)
       SpreadsheetApp.getActiveSpreadsheet().toast(
-        `⚠️ Je bent ingelogd als ${activeUserEmail}. Om een mail merge uit te voeren dien je ingelogd te zijn als ${expectedEmail}. TIP: Gebruik een incognito venster!`,
+        `⚠️ Je bent ingelogd als ${currentUser}. Om mails correct te verzenden dien je ingelogd te zijn als joost@thermoclinics.nl. TIP: Gebruik een incognito venster!`,
         '⚠️ Verkeerd Google Account',
         10 // Show for 10 seconds
       );
     }
   } catch (e) {
-    // If we can't check the user (permission not granted), show a toast suggesting authorization
-    SpreadsheetApp.getActiveSpreadsheet().toast(
-      'Ga naar "Thermoclinics Tools" → "Check of alle permissies zijn toegekend" om alle functies te kunnen gebruiken.',
-      'ℹ️ Autorisatie vereist',
-      8
-    );
+    // GmailApp.getAliases() failed - this typically means Gmail permissions aren't granted yet
+    // Only show authorization message if it's actually an authorization error
+    if (e.message && (e.message.includes('authorize') || e.message.includes('permission') || e.message.includes('access'))) {
+      SpreadsheetApp.getActiveSpreadsheet().toast(
+        'Ga naar "Thermoclinics Tools" → "Check of alle permissies zijn toegekend" om alle functies te kunnen gebruiken.',
+        'ℹ️ Autorisatie vereist',
+        8
+      );
+    }
+    // For other errors (like wrong account type), silently ignore - the mail merge dialogs will show their own warnings
   }
 }
 
