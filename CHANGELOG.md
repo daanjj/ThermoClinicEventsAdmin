@@ -1,5 +1,56 @@
 # Changelog
 
+## Updates (January 2026)
+
+### ✨ New Features
+
+#### Archive Strikethrough Participants Menu Function
+- **New menu item**: "Archiveer doorgestreepte deelnemers" added to Thermoclinics Tools menu
+- **Smart archiving**: Scans Open and Besloten sheets for strikethrough rows and ensures they're in the archive
+- **Optional deletion**: Prompts user whether to delete already-archived strikethrough rows (with confirmation)
+- **Age protection**: Only deletes rows if the event date is older than the archive threshold
+- **Detailed logging**: Logs each participant added to archive or marked for deletion
+
+**Impact**: Provides a manual cleanup tool to verify and optionally remove archived participant data.
+
+#### Centralized Archive Threshold Configuration
+- **New constant**: `ARCHIVE_THRESHOLD_DAYS` in Constants.js (default: 30 days)
+- **Single source of truth**: All archiving functions now use this constant
+- **Dynamic messaging**: Log messages and dialogs reflect the configured threshold
+- **Renamed variable**: `thirtyDaysAgo` → `archiveThresholdDate` for clarity
+
+**Impact**: Archive threshold can now be changed in one place instead of multiple hardcoded values.
+
+### 🐛 Bug Fixes
+
+#### Participant Archiving Reliability
+- **Normalized clinic name matching**: Added `normalizeClinicName()` function to handle whitespace, non-breaking spaces, and punctuation differences
+- **Verification before strike-through**: Archive write is now verified with `SpreadsheetApp.flush()` before applying strike-through
+- **Row count verification**: Confirms expected number of rows were written before marking as archived
+- **Email verification**: Validates first archived row contains expected data
+- **Critical error logging**: Detailed error messages when verification fails, preventing data loss
+
+**Impact**: Strike-through formatting is only applied after verified successful archiving, preventing data loss scenarios.
+
+#### Gmail Alias Check in onOpen()
+- **Fixed account check**: Now checks for Gmail alias availability instead of hardcoded email address
+- **Consistent check**: Uses same `EMAIL_SENDER_ALIAS` constant as mail merge dialogs
+- **Smarter error handling**: Authorization message only shown for actual permission errors
+
+### 🔧 Technical Improvements
+
+#### Constants Updates
+- Added `ARCHIVE_THRESHOLD_DAYS = 30` for configurable archive threshold
+
+#### New Utility Functions
+- `normalizeClinicName(clinicName)`: Normalizes clinic names for robust string comparison
+- `archiveStrikethroughParticipants()`: Menu function to archive/cleanup strikethrough participants
+
+#### Menu Updates
+- Added "Archiveer doorgestreepte deelnemers" menu item in Thermoclinics Tools
+
+---
+
 ## Recent Updates (November 2025)
 
 ### ✨ New Features
