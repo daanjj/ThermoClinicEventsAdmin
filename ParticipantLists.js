@@ -32,10 +32,10 @@ function getClinicsForParticipantList() {
     const clinicOptions = [];
 
     // --- CHANGE STARTS HERE ---
-    // Calculate the date 30 days ago and normalize it to the start of the day.
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    thirtyDaysAgo.setHours(0, 0, 0, 0); 
+    // Calculate the date threshold and normalize it to the start of the day.
+    const archiveThresholdDate = new Date();
+    archiveThresholdDate.setDate(archiveThresholdDate.getDate() - ARCHIVE_THRESHOLD_DAYS);
+    archiveThresholdDate.setHours(0, 0, 0, 0); 
     // --- CHANGE ENDS HERE ---
 
     for (let i = 0; i < allData.length; i++) {
@@ -48,8 +48,8 @@ function getClinicsForParticipantList() {
       let eventDate = (dateValue instanceof Date) ? dateValue : new Date(dateValue);
       
       // --- CHANGE STARTS HERE ---
-      // Compare the event date with the 'thirtyDaysAgo' date instead of 'today'.
-      if (isNaN(eventDate.getTime()) || eventDate < thirtyDaysAgo) continue; // Skip invalid or dates older than 30 days
+      // Compare the event date with the threshold date.
+      if (isNaN(eventDate.getTime()) || eventDate < archiveThresholdDate) continue; // Skip invalid or dates older than threshold
       // --- CHANGE ENDS HERE ---
 
       const numBookedSeats = parseInt(bookedSeatsRaw, 10);

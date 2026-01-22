@@ -30,7 +30,7 @@ function archiveStrikethroughParticipants() {
   
   const deleteResponse = ui.alert(
     'Doorgestreepte deelnemers verwijderen?',
-    'Wil je doorgestreepte deelnemers die al in het archief staan VERWIJDEREN uit de bron-sheets?\n\n' +
+    `Wil je doorgestreepte deelnemers die al in het archief en wiens event langer dan ${ARCHIVE_THRESHOLD_DAYS} dagen geleden heeft plaatsgevonden VERWIJDEREN uit de bron-sheets?\n\n` +
     'Klik CANCEL / ANNULEREN om alleen te archiveren zonder te verwijderen (aanbevolen).\n' +
     'Klik OK om te verwijderen.',
     ui.ButtonSet.OK_CANCEL
@@ -140,8 +140,18 @@ function archiveStrikethroughParticipants() {
         if (alreadyArchivedParticipants.has(archiveKey)) {
           sheetAlreadyArchived++;
           if (shouldDelete) {
-            rowsToDelete.push(rowNum);
-            logMessage(`Markeren voor verwijdering: ${email} van "${rawClinicName}" (${sheetName}) - staat al in archief`);
+            // Only delete if the event date is more than ARCHIVE_THRESHOLD_DAYS days ago
+            const eventDate = parseDutchDateFromClinicName(rawClinicName);
+            const thresholdDate = new Date();
+            thresholdDate.setDate(thresholdDate.getDate() - ARCHIVE_THRESHOLD_DAYS);
+            thresholdDate.setHours(0, 0, 0, 0);
+            
+            if (eventDate && eventDate < thresholdDate) {
+              rowsToDelete.push(rowNum);
+              logMessage(`Markeren voor verwijdering: ${email} van "${rawClinicName}" (${sheetName}) - staat al in archief en is ouder dan ${ARCHIVE_THRESHOLD_DAYS} dagen`);
+            } else {
+              logMessage(`Overslaan verwijdering: ${email} van "${rawClinicName}" (${sheetName}) - event is minder dan ${ARCHIVE_THRESHOLD_DAYS} dagen geleden`);
+            }
           }
           continue; // Already in archive
         }
@@ -218,10 +228,10 @@ function fixMissedArchivedParticipants() {
     const dataClinicsSpreadsheet = SpreadsheetApp.openById(DATA_CLINICS_SPREADSHEET_ID);
     const responseSs = SpreadsheetApp.getActiveSpreadsheet();
     
-    // Define the threshold for archiving (30 days old)
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    thirtyDaysAgo.setHours(0, 0, 0, 0);
+    // Define the threshold for archiving
+    const archiveThresholdDate = new Date();
+    archiveThresholdDate.setDate(archiveThresholdDate.getDate() - ARCHIVE_THRESHOLD_DAYS);
+    archiveThresholdDate.setHours(0, 0, 0, 0);
     
     // Get archived clinic names from the archive sheet
     const archiveSheet = dataClinicsSpreadsheet.getSheetByName(ARCHIVE_SHEET_NAME);
@@ -332,15 +342,15 @@ function fixMissedArchivedParticipants() {
         
         // Check if this participant should be archived:
         // 1. Their clinic is in the archive (using normalized matching), OR
-        // 2. Their clinic date (parsed from the clinic name) is older than 30 days
+        // 2. Their clinic date (parsed from the clinic name) is older than the threshold
         let shouldArchive = normalizedArchivedClinicNames.has(normalizedParticipantClinicName);
         
         if (!shouldArchive && rawParticipantClinicName) {
           // Try to parse date from clinic name (format: "dag dd maand yyyy HH:MM-HH:MM, Locatie")
           const clinicDate = parseDutchDateFromClinicName(rawParticipantClinicName);
-          if (clinicDate && clinicDate < thirtyDaysAgo) {
+          if (clinicDate && clinicDate < archiveThresholdDate) {
             shouldArchive = true;
-            logMessage(`Clinic "${rawParticipantClinicName}" is ouder dan 30 dagen (datum: ${clinicDate.toLocaleDateString('nl-NL')})`);
+            logMessage(`Clinic "${rawParticipantClinicName}" is ouder dan ${ARCHIVE_THRESHOLD_DAYS} dagen (datum: ${clinicDate.toLocaleDateString('nl-NL')})`);
           }
         }
         
@@ -438,10 +448,10 @@ function archiveOldClinics(isManualTrigger) {
       logMessage(`Archief sheet '${ARCHIVE_SHEET_NAME}' aangemaakt.`);
     }
 
-    // Define the threshold for archiving (e.g., 30 days old)
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    thirtyDaysAgo.setHours(0, 0, 0, 0); // Normalize to start of day
+    // Define the threshold for archiving
+    const archiveThresholdDate = new Date();
+    archiveThresholdDate.setDate(archiveThresholdDate.getDate() - ARCHIVE_THRESHOLD_DAYS);
+    archiveThresholdDate.setHours(0, 0, 0, 0); // Normalize to start of day
 
     const allData = dataClinicsSheet.getDataRange().getValues();
     if (allData.length <= DATA_CLINICS_START_ROW -1) { // Only headers or empty
@@ -468,7 +478,7 @@ function archiveOldClinics(isManualTrigger) {
         return;
       }
 
-      if (clinicDate < thirtyDaysAgo) {
+      if (clinicDate < archiveThresholdDate) {
         clinicsToArchive.push(row);
         const clinicName = `${getDutchDateString(clinicDate)} ${String(row[TIME_COLUMN_INDEX - 1] || '').trim()}, ${String(row[LOCATION_COLUMN_INDEX - 1] || '').trim()}`;
         archivedClinicNames.add(clinicName);
@@ -480,7 +490,7 @@ function archiveOldClinics(isManualTrigger) {
 
     const numArchived = clinicsToArchive.length;
     if (numArchived === 0) {
-      const message = 'Geen clinics ouder dan 30 dagen gevonden om te archiveren.';
+      const message = `Geen clinics ouder dan ${ARCHIVE_THRESHOLD_DAYS} dagen gevonden om te archiveren.`;
       logMessage(message);
       logMessage(`----- EINDE ${logPrefix} -----`);
       return;
