@@ -24,7 +24,7 @@ function onOpen() {
     if (activeUserEmail !== expectedEmail) {
       // Show a one-time warning toast (non-intrusive)
       SpreadsheetApp.getActiveSpreadsheet().toast(
-        `⚠️ U bent ingelogd als ${activeUserEmail}. Voor mail merge moet u ingelogd zijn als ${expectedEmail}. TIP: Gebruik een incognito venster!`,
+        `⚠️ Je bent ingelogd als ${activeUserEmail}. Om een mail merge uit te voeren dien je ingelogd te zijn als ${expectedEmail}. TIP: Gebruik een incognito venster!`,
         '⚠️ Verkeerd Google Account',
         10 // Show for 10 seconds
       );

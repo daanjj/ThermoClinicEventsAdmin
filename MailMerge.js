@@ -12,12 +12,12 @@ function showMailMergeDialog() {
     const currentUser = Session.getActiveUser().getEmail() || Session.getEffectiveUser().getEmail() || 'onbekend';
     const ui = SpreadsheetApp.getUi();
     const response = ui.alert(
-      'Verkeerd account',
+      'Verkeerd account!',
       `Let op: Email alias "${desiredAlias}" niet gevonden.\n\n` +
       `Je bent ingelogd als: ${currentUser}\n` +
-      `Voor correcte afzender moet je inloggen als: joost@thermoclinics.nl\n\n` +
-      `Als je doorgaat worden de mails verstuurd vanuit ${currentUser}.\n\n` +
-      `Wil je doorgaan?`,
+      `Om mails te laten verzenden door de juiste afzender dien je ingelogd te zijn als: joost@thermoclinics.nl\n\n` +
+      `Als je doorgaat worden de mails echter verstuurd vanuit ${currentUser}.\n\n` +
+      `Wil je toch doorgaan?`,
       ui.ButtonSet.YES_NO
     );
     

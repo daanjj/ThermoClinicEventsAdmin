@@ -97,7 +97,7 @@ function updateEventFolderIDs() {
 function recreateAllCalendarEvents() {
   const ui = SpreadsheetApp.getUi();
   const response = ui.alert(
-    'Calendar Events Opnieuw Aanmaken',
+    'Calendar events opnieuw Aanmaken',
     'Dit zal voor ALLE clinics in de Data Clinics sheet een nieuw calendar event aanmaken.\n\n' +
     'Zorg eerst dat je:\n' +
     '1. De "Calendar Event ID" kolom hebt leeggemaakt\n' +

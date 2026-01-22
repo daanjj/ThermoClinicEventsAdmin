@@ -44,8 +44,9 @@ function fixMissedArchivedParticipants() {
       return;
     }
     
-    // Build set of archived clinic names
+    // Build set of archived clinic names (normalized for robust matching)
     const archivedClinicNames = new Set();
+    const normalizedArchivedClinicNames = new Set();
     for (let i = 1; i < archiveData.length; i++) {
       const row = archiveData[i];
       const dateValue = row[DATE_COLUMN_INDEX - 1];
@@ -55,9 +56,11 @@ function fixMissedArchivedParticipants() {
       
       const clinicName = `${getDutchDateString(clinicDate)} ${String(row[TIME_COLUMN_INDEX - 1] || '').trim()}, ${String(row[LOCATION_COLUMN_INDEX - 1] || '').trim()}`;
       archivedClinicNames.add(clinicName);
+      normalizedArchivedClinicNames.add(normalizeClinicName(clinicName));
     }
     
     logMessage(`${archivedClinicNames.size} gearchiveerde clinics gevonden.`);
+    logMessage(`Gearchiveerde clinic namen (genormaliseerd): ${Array.from(normalizedArchivedClinicNames).slice(0, 5).join('; ')}${normalizedArchivedClinicNames.size > 5 ? '...' : ''}`);
     
     // Get or create participant archive sheet
     let participantArchiveSheet = responseSs.getSheetByName(ARCHIVE_PARTICIPANTS_SHEET_NAME);
@@ -66,7 +69,7 @@ function fixMissedArchivedParticipants() {
       logMessage(`Deelnemers archief sheet '${ARCHIVE_PARTICIPANTS_SHEET_NAME}' aangemaakt.`);
     }
     
-    // Build set of already archived participants (email + clinic name as key)
+    // Build set of already archived participants (email + normalized clinic name as key)
     const alreadyArchivedParticipants = new Set();
     if (participantArchiveSheet.getLastRow() > 1) {
       const archiveParticipantData = participantArchiveSheet.getDataRange().getValues();
@@ -77,7 +80,7 @@ function fixMissedArchivedParticipants() {
       if (archiveEmailIdx !== -1 && archiveEventIdx !== -1) {
         for (let i = 1; i < archiveParticipantData.length; i++) {
           const email = String(archiveParticipantData[i][archiveEmailIdx] || '').trim().toLowerCase();
-          const eventName = String(archiveParticipantData[i][archiveEventIdx] || '').replace(/\s\(.*\)$/, '').trim();
+          const eventName = normalizeClinicName(String(archiveParticipantData[i][archiveEventIdx] || '').replace(/\s\(.*\)$/, ''));
           if (email && eventName) {
             alreadyArchivedParticipants.add(`${email}|${eventName}`);
           }
@@ -129,32 +132,33 @@ function fixMissedArchivedParticipants() {
         const currentFormat = responseSheet.getRange(rowNum, 1).getFontLine();
         const hasStrikethrough = currentFormat === 'line-through';
         
-        const participantClinicName = String(row[eventColIdx] || '').replace(/\s\(.*\)$/, '').trim();
+        const rawParticipantClinicName = String(row[eventColIdx] || '').replace(/\s\(.*\)$/, '').trim();
+        const normalizedParticipantClinicName = normalizeClinicName(rawParticipantClinicName);
         const participantEmail = String(row[emailColIdx] || '').trim().toLowerCase();
         
         // Check if this participant should be archived:
-        // 1. Their clinic is in the archive, OR
+        // 1. Their clinic is in the archive (using normalized matching), OR
         // 2. Their clinic date (parsed from the clinic name) is older than 30 days
-        let shouldArchive = archivedClinicNames.has(participantClinicName);
+        let shouldArchive = normalizedArchivedClinicNames.has(normalizedParticipantClinicName);
         
-        if (!shouldArchive && participantClinicName) {
+        if (!shouldArchive && rawParticipantClinicName) {
           // Try to parse date from clinic name (format: "dag dd maand yyyy HH:MM-HH:MM, Locatie")
-          const clinicDate = parseDutchDateFromClinicName(participantClinicName);
+          const clinicDate = parseDutchDateFromClinicName(rawParticipantClinicName);
           if (clinicDate && clinicDate < thirtyDaysAgo) {
             shouldArchive = true;
-            logMessage(`Clinic "${participantClinicName}" is ouder dan 30 dagen (datum: ${clinicDate.toLocaleDateString('nl-NL')})`);
+            logMessage(`Clinic "${rawParticipantClinicName}" is ouder dan 30 dagen (datum: ${clinicDate.toLocaleDateString('nl-NL')})`);
           }
         }
         
         if (shouldArchive) {
-          const archiveKey = `${participantEmail}|${participantClinicName}`;
+          const archiveKey = `${participantEmail}|${normalizedParticipantClinicName}`;
           
           // Add to archive if not already there
           if (!alreadyArchivedParticipants.has(archiveKey)) {
             const archiveRow = [...row, sheetName];
             participantsToArchive.push(archiveRow);
             alreadyArchivedParticipants.add(archiveKey); // Prevent duplicates within same run
-            logMessage(`Toevoegen aan archief: ${participantEmail} van "${participantClinicName}" (${sheetName})`);
+            logMessage(`Toevoegen aan archief: ${participantEmail} van "${rawParticipantClinicName}" (${sheetName})`);
           }
           
           // Apply strike-through if not already applied
@@ -164,22 +168,47 @@ function fixMissedArchivedParticipants() {
         }
       }
       
-      // Archive missing participants
+      // Archive missing participants - with verification before applying strike-through
       if (participantsToArchive.length > 0) {
         const startRow = participantArchiveSheet.getLastRow() + 1;
+        const expectedEndRow = startRow + participantsToArchive.length - 1;
+        
         participantArchiveSheet.getRange(startRow, 1, participantsToArchive.length, participantsToArchive[0].length)
           .setValues(participantsToArchive);
+        
+        // Force flush to ensure data is written
+        SpreadsheetApp.flush();
+        
+        // VERIFICATION: Read back to confirm data was actually written
+        const actualLastRow = participantArchiveSheet.getLastRow();
+        const archiveSuccessful = actualLastRow >= expectedEndRow;
+        
+        if (!archiveSuccessful) {
+          logMessage(`KRITIEKE FOUT: Archivering mislukt voor ${participantsToArchive.length} deelnemers uit '${sheetName}'. ` +
+                     `Verwacht einde rij: ${expectedEndRow}, werkelijk: ${actualLastRow}. ` +
+                     `Strike-through wordt NIET toegepast om dataverlies te voorkomen.`);
+          return; // Skip strike-through for this sheet
+        }
+        
         totalFixed += participantsToArchive.length;
         logMessage(`${participantsToArchive.length} ontbrekende deelnemers toegevoegd aan archief vanuit '${sheetName}'.`);
-      }
-      
-      // Apply strike-through to rows that don't have it
-      if (rowsToStrikeThrough.length > 0) {
+        
+        // Only apply strike-through after successful archive verification
+        if (rowsToStrikeThrough.length > 0) {
+          rowsToStrikeThrough.forEach(rowNum => {
+            responseSheet.getRange(rowNum, 1, 1, responseSheet.getLastColumn()).setFontLine('line-through');
+          });
+          totalStrikethrough += rowsToStrikeThrough.length;
+          logMessage(`${rowsToStrikeThrough.length} rijen doorgestreept in '${sheetName}'.`);
+        }
+      } else if (rowsToStrikeThrough.length > 0) {
+        // No new participants to archive but some rows need strike-through 
+        // (already in archive but not struck through)
         rowsToStrikeThrough.forEach(rowNum => {
           responseSheet.getRange(rowNum, 1, 1, responseSheet.getLastColumn()).setFontLine('line-through');
         });
         totalStrikethrough += rowsToStrikeThrough.length;
-        logMessage(`${rowsToStrikeThrough.length} rijen doorgestreept in '${sheetName}'.`);
+        logMessage(`${rowsToStrikeThrough.length} rijen doorgestreept in '${sheetName}' (deelnemers al in archief).`);
       }
     });
     
@@ -289,6 +318,14 @@ function archiveOldClinics(isManualTrigger) {
     // Track standard headers for consistency across different response sheets
     let standardHeaders = null;
     
+    // Convert archivedClinicNames Set to normalized versions for more robust matching
+    const normalizedArchivedClinicNames = new Set();
+    archivedClinicNames.forEach(name => {
+      normalizedArchivedClinicNames.add(normalizeClinicName(name));
+    });
+    
+    logMessage(`Gearchiveerde clinic namen (genormaliseerd): ${Array.from(normalizedArchivedClinicNames).join('; ')}`);
+    
     [OPEN_FORM_RESPONSE_SHEET_NAME, BESLOTEN_FORM_RESPONSE_SHEET_NAME].forEach(sheetName => {
       const responseSheet = responseSs.getSheetByName(sheetName);
       if (!responseSheet) {
@@ -340,9 +377,10 @@ function archiveOldClinics(isManualTrigger) {
       // Find participants from archived clinics
       for (let i = 1; i < responseData.length; i++) {
         const row = responseData[i];
-        const participantClinicName = (row[eventColIdx] || '').replace(/\s\(.*\)$/, '').trim();
+        const rawParticipantClinicName = (row[eventColIdx] || '').replace(/\s\(.*\)$/, '').trim();
+        const normalizedParticipantClinicName = normalizeClinicName(rawParticipantClinicName);
         
-        if (archivedClinicNames.has(participantClinicName)) {
+        if (normalizedArchivedClinicNames.has(normalizedParticipantClinicName)) {
           // Create archive row with original data + source sheet as last column
           // Format: [Timestamp, Email, First Name, Last Name, Event, Phone, DOB, City, Participant#, etc., Bron Sheet]
           const archiveRow = [...row, sheetName]; // Append source sheet as last column
@@ -357,17 +395,48 @@ function archiveOldClinics(isManualTrigger) {
           
           // Log the participant being archived for debugging
           const participantEmail = row[responseHeaders.indexOf(FORM_EMAIL_QUESTION_TITLE)] || 'Onbekend email';
-          logMessage(`Archivering deelnemer: ${participantEmail} van clinic "${participantClinicName}" uit '${sheetName}'`);
+          logMessage(`Archivering deelnemer: ${participantEmail} van clinic "${rawParticipantClinicName}" uit '${sheetName}'`);
         }
       }
       
-      // Archive participants to the archive sheet
+      // Archive participants to the archive sheet - with verification before applying strike-through
       if (participantsToArchive.length > 0) {
         const startRow = participantArchiveSheet.getLastRow() + 1;
+        const expectedEndRow = startRow + participantsToArchive.length - 1;
+        
+        // Write to archive sheet
         participantArchiveSheet.getRange(startRow, 1, participantsToArchive.length, participantsToArchive[0].length)
           .setValues(participantsToArchive);
         
-        // Apply strike-through formatting to original rows
+        // Force flush to ensure data is written
+        SpreadsheetApp.flush();
+        
+        // VERIFICATION: Read back to confirm data was actually written
+        const actualLastRow = participantArchiveSheet.getLastRow();
+        const archiveSuccessful = actualLastRow >= expectedEndRow;
+        
+        if (!archiveSuccessful) {
+          logMessage(`KRITIEKE FOUT: Archivering mislukt voor ${participantsToArchive.length} deelnemers uit '${sheetName}'. ` +
+                     `Verwacht einde rij: ${expectedEndRow}, werkelijk: ${actualLastRow}. ` +
+                     `Strike-through wordt NIET toegepast om dataverlies te voorkomen.`);
+          return; // Skip strike-through for this sheet
+        }
+        
+        // Additional verification: check that the first archived row contains expected data
+        const verificationData = participantArchiveSheet.getRange(startRow, 1, 1, participantsToArchive[0].length).getValues()[0];
+        const firstArchivedEmail = participantsToArchive[0][responseHeaders.indexOf(FORM_EMAIL_QUESTION_TITLE)] || '';
+        const verificationEmail = verificationData[responseHeaders.indexOf(FORM_EMAIL_QUESTION_TITLE)] || '';
+        
+        if (String(firstArchivedEmail).trim().toLowerCase() !== String(verificationEmail).trim().toLowerCase()) {
+          logMessage(`KRITIEKE FOUT: Verificatie mislukt - gearchiveerde data komt niet overeen. ` +
+                     `Verwacht email: "${firstArchivedEmail}", gevonden: "${verificationEmail}". ` +
+                     `Strike-through wordt NIET toegepast.`);
+          return; // Skip strike-through for this sheet
+        }
+        
+        logMessage(`Archivering geverifieerd: ${participantsToArchive.length} deelnemers succesvol geschreven naar rij ${startRow}-${expectedEndRow}.`);
+        
+        // Only apply strike-through after successful verification
         rowsToStrikeThrough.forEach(rowNum => {
           const range = responseSheet.getRange(rowNum, 1, 1, responseSheet.getLastColumn());
           range.setFontLine('line-through');
@@ -428,4 +497,27 @@ function parseDutchDateFromClinicName(clinicName) {
     Logger.log(`Error parsing date from clinic name "${clinicName}": ${e.message}`);
     return null;
   }
+}
+
+/**
+ * Helper function to normalize a clinic name for robust comparison.
+ * This handles common string matching issues like:
+ * - Multiple spaces
+ * - Leading/trailing whitespace
+ * - Inconsistent capitalization
+ * - Non-breaking spaces or other unicode whitespace
+ * 
+ * @param {string} clinicName - The clinic name to normalize
+ * @returns {string} - The normalized clinic name for comparison
+ */
+function normalizeClinicName(clinicName) {
+  if (!clinicName) return '';
+  
+  return String(clinicName)
+    .toLowerCase()                           // Normalize case
+    .replace(/\s+/g, ' ')                    // Collapse multiple whitespace to single space
+    .replace(/[\u00A0\u2007\u202F]/g, ' ')   // Replace non-breaking spaces with regular space
+    .replace(/\s*,\s*/g, ', ')               // Normalize comma spacing
+    .replace(/\s*-\s*/g, '-')                // Normalize dash spacing  
+    .trim();                                  // Remove leading/trailing whitespace
 }
