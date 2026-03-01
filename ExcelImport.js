@@ -47,7 +47,7 @@ function processExcelFile(fileId) {
       mimeType: MimeType.GOOGLE_SHEETS,
       parents: [{ id: excelFile.getParents().next().getId() }] // Keep it in the same folder as the original Excel
     };
-    const tempSheet = Drive.Files.insert(resource, excelFile.getBlob());
+    const tempSheet = Drive.Files.insert(resource, excelFile.getBlob(), { supportsAllDrives: true });
     tempSheetId = tempSheet.id;
     logMessage(`Tijdelijke Google Sheet aangemaakt met ID: ${tempSheetId}`);
 
