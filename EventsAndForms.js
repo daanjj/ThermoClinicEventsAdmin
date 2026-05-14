@@ -135,6 +135,236 @@ function handleEventChange(e) {
 }
 
 /**
+ * Builds the calendar event title for a given row's data.
+ * Returns a string like:
+ * "Thermoclinic op/bij <Locatie> (<# deelnemers>; InstructorA+InstructorB)"
+ */
+function buildCalendarTitleFromRow(rowData, headerMap) {
+  const location = String(rowData[headerMap['Locatie']] || '').trim();
+  const bookedSeatsRaw = rowData[headerMap['Aantal boekingen']];
+  const bookedSeats = parseInt(bookedSeatsRaw, 10) || 0;
+
+  // Collect instructors
+  const instructorHeaders = ['Instructeur 1', 'Instructeur 2', 'Instructeur 3'];
+  const instructors = [];
+  instructorHeaders.forEach(h => {
+    const idx = headerMap[String(h).trim()];
+    if (idx !== undefined) {
+      const val = rowData[idx];
+      if (val !== undefined && String(val).trim() !== '') {
+        instructors.push(String(val).trim());
+      }
+    }
+  });
+
+  let titleSuffix;
+  if (!bookedSeats) {
+    titleSuffix = `${location} (OPTIE - nog geen deelnemers`;
+  } else {
+    titleSuffix = `${location} (${bookedSeats} ${bookedSeats === 1 ? 'deelnemer' : 'deelnemers'}`;
+  }
+  if (instructors.length > 0) {
+    titleSuffix += `; ${instructors.join('+')}`;
+  }
+  titleSuffix += ')';
+
+  return `Thermoclinic op/bij ${titleSuffix}`;
+}
+
+/**
+ * Menu command: iterate all rows in the Data Clinics sheet and ensure calendar events exist
+ * and have the correct title/location/time. Shows a Dutch summary when finished.
+ */
+function checkAndSyncAllCalendarEvents() {
+  const ss = SpreadsheetApp.openById(DATA_CLINICS_SPREADSHEET_ID);
+  const sheet = ss.getSheetByName(DATA_CLINICS_SHEET_NAME);
+  if (!sheet) {
+    SpreadsheetApp.getUi().alert('FOUT: Kon sheet niet vinden: ' + DATA_CLINICS_SHEET_NAME);
+    return;
+  }
+
+  const lastRow = sheet.getLastRow();
+  if (lastRow < DATA_CLINICS_START_ROW) {
+    SpreadsheetApp.getUi().alert('Geen events gevonden om te controleren.');
+    return;
+  }
+
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  const headerMap = {};
+  headers.forEach((h, i) => headerMap[String(h).trim()] = i);
+
+  const rows = sheet.getRange(DATA_CLINICS_START_ROW, 1, lastRow - DATA_CLINICS_START_ROW + 1, sheet.getLastColumn()).getValues();
+  const calendar = CalendarApp.getCalendarById(TARGET_CALENDAR_ID);
+  if (!calendar) {
+    SpreadsheetApp.getUi().alert('FOUT: Kalender niet gevonden. Controleer TARGET_CALENDAR_ID.');
+    return;
+  }
+
+  let added = 0;
+  let updated = 0;
+
+  for (let i = 0; i < rows.length; i++) {
+    const rowNum = DATA_CLINICS_START_ROW + i;
+    const rowData = rows[i];
+
+    // Determine max seats; if 0, ensure event is deleted (behaviour like syncCalendarEventFromSheet)
+    const possibleMaxSeatsHeaders = ['Maximum aantal deelnemers', 'Maximum aantal', 'Max seats', 'Maximaal aantal', 'Maximum', 'Max'];
+    let maxSeatsColIdx = -1;
+    for (const h of possibleMaxSeatsHeaders) {
+      if (headerMap[h] !== undefined) { maxSeatsColIdx = headerMap[h]; break; }
+    }
+    if (maxSeatsColIdx === -1) maxSeatsColIdx = MAX_SEATS_COLUMN_INDEX - 1;
+    const maxSeats = parseInt(rowData[maxSeatsColIdx], 10) || 0;
+
+    const eventIdColIdx = headerMap[CALENDAR_EVENT_ID_HEADER];
+    const eventIdCell = eventIdColIdx !== undefined ? sheet.getRange(rowNum, eventIdColIdx + 1) : null;
+    const beforeEventId = eventIdCell ? String(eventIdCell.getValue() || '').trim() : '';
+
+    if (maxSeats === 0) {
+      // delete existing event if present
+      if (beforeEventId) {
+        try {
+          const evt = calendar.getEventById(beforeEventId);
+          if (evt) evt.deleteEvent();
+        } catch (e) {
+          // ignore deletion errors
+        }
+        if (eventIdCell) eventIdCell.setValue('');
+      }
+      continue;
+    }
+
+    // Build expected title
+    const expectedTitle = buildCalendarTitleFromRow(rowData, headerMap);
+
+    if (!beforeEventId) {
+      // create new event: mimic syncCalendarEventFromSheet minimal creation (all-day or with parsed time)
+      const dateValue = rowData[headerMap['Datum']];
+      const timeValue = rowData[headerMap['Tijdstip']];
+      if (!dateValue) continue;
+      const eventDate = new Date(dateValue);
+
+      // parse time similar to syncCalendarEventFromSheet
+      let startTime, endTime, isAllDay = false;
+      if (timeValue) {
+        const match = String(timeValue).match(/(\d{1,2})[:.]?(\d{2})?\s*-\s*(\d{1,2})[:.]?(\d{2})?/);
+        if (match) {
+          const startHour = parseInt(match[1], 10);
+          const startMinute = parseInt(match[2], 10) || 0;
+          let endHour = parseInt(match[3], 10);
+          let endMinute = parseInt(match[4], 10) || 0;
+          startTime = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate(), startHour, startMinute, 0);
+          endTime = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate(), endHour, endMinute, 0);
+          if (endTime < startTime) endTime.setDate(endTime.getDate() + 1);
+        } else {
+          const singleMatch = String(timeValue).match(/(\d{1,2})[:.]?(\d{2})/);
+          if (singleMatch) {
+            const hour = parseInt(singleMatch[1], 10);
+            const minute = parseInt(singleMatch[2], 10) || 0;
+            startTime = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate(), hour, minute, 0);
+            endTime = new Date(startTime.getTime() + DEFAULT_EVENT_DURATION_HOURS * 60 * 60 * 1000);
+          } else {
+            isAllDay = true;
+          }
+        }
+      } else {
+        isAllDay = true;
+      }
+
+      try {
+        const location = String(rowData[headerMap['Locatie']] || '').trim();
+        const eventOptions = { location };
+        let newEvent;
+        if (isAllDay) newEvent = calendar.createAllDayEvent(expectedTitle, eventDate, eventOptions);
+        else newEvent = calendar.createEvent(expectedTitle, startTime, endTime, eventOptions);
+        if (eventIdCell) eventIdCell.setValue(newEvent.getId());
+        added++;
+      } catch (e) {
+        // ignore single-row errors and continue
+      }
+
+    } else {
+      // attempt to fetch existing event and compare title; update if different
+      try {
+        const evt = calendar.getEventById(beforeEventId);
+        if (!evt) {
+          // not found -> create new
+          const dateValue = rowData[headerMap['Datum']];
+          const timeValue = rowData[headerMap['Tijdstip']];
+          if (!dateValue) continue;
+          const eventDate = new Date(dateValue);
+          let startTime, endTime, isAllDay = false;
+          if (timeValue) {
+            const match = String(timeValue).match(/(\d{1,2})[:.]?(\d{2})?\s*-\s*(\d{1,2})[:.]?(\d{2})?/);
+            if (match) {
+              const startHour = parseInt(match[1], 10);
+              const startMinute = parseInt(match[2], 10) || 0;
+              let endHour = parseInt(match[3], 10);
+              let endMinute = parseInt(match[4], 10) || 0;
+              startTime = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate(), startHour, startMinute, 0);
+              endTime = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate(), endHour, endMinute, 0);
+              if (endTime < startTime) endTime.setDate(endTime.getDate() + 1);
+            } else {
+              const singleMatch = String(timeValue).match(/(\d{1,2})[:.]?(\d{2})/);
+              if (singleMatch) {
+                const hour = parseInt(singleMatch[1], 10);
+                const minute = parseInt(singleMatch[2], 10) || 0;
+                startTime = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate(), hour, minute, 0);
+                endTime = new Date(startTime.getTime() + DEFAULT_EVENT_DURATION_HOURS * 60 * 60 * 1000);
+              } else {
+                isAllDay = true;
+              }
+            }
+          } else {
+            isAllDay = true;
+          }
+          const location = String(rowData[headerMap['Locatie']] || '').trim();
+          const eventOptions = { location };
+          let newEvent;
+          if (isAllDay) newEvent = calendar.createAllDayEvent(expectedTitle, eventDate, eventOptions);
+          else newEvent = calendar.createEvent(expectedTitle, startTime, endTime, eventOptions);
+          if (eventIdCell) eventIdCell.setValue(newEvent.getId());
+          added++;
+        } else {
+          // exists, compare title and update if different
+          const currentTitle = evt.getTitle();
+          if (currentTitle !== expectedTitle) {
+            evt.setTitle(expectedTitle);
+            // update location as well
+            const location = String(rowData[headerMap['Locatie']] || '').trim();
+            try { evt.setLocation(location); } catch (e) {}
+            updated++;
+          }
+        }
+      } catch (e) {
+        // errors fetching event -> try create new
+        try {
+          const dateValue = rowData[headerMap['Datum']];
+          if (!dateValue) continue;
+          const eventDate = new Date(dateValue);
+          const location = String(rowData[headerMap['Locatie']] || '').trim();
+          const newEvent = calendar.createAllDayEvent(expectedTitle, eventDate, { location });
+          if (eventIdCell) eventIdCell.setValue(newEvent.getId());
+          added++;
+        } catch (e2) {
+          // ignore
+        }
+      }
+    }
+  }
+
+  // Show summary in Dutch
+  const ui = SpreadsheetApp.getUi();
+  if (added === 0 && updated === 0) {
+    ui.alert('Controle voltooid', 'Alle agenda-items zijn correct — geen updates nodig.', ui.ButtonSet.OK);
+  } else {
+    ui.alert('Controle voltooid', `Agenda-sync afgerond:\nToegevoegd: ${added}\nGeüpdatet: ${updated}`, ui.ButtonSet.OK);
+  }
+}
+
+/** menu handled in Triggers.js **/
+
+/**
  * Handles clinic type changes (Open <-> Besloten) by moving all participants 
  * from one response sheet to the other.
  * @param {Object} e The event object from the onEdit trigger.
@@ -378,8 +608,32 @@ function syncCalendarEventFromSheet(rowNum) {
   try {
     // Mark this row as being processed for 10 seconds
     cache.put(lockKey, 'processing', 10);
-    
-    let titleSuffix = !bookedSeats ? `${location} (OPTIE - nog geen deelnemers)` : `${location} (${bookedSeats} ${bookedSeats === 1 ? 'deelnemer' : 'deelnemers'})`;
+
+    // Collect instructor values from the sheet if present
+    const instructorHeaders = ['Instructeur 1', 'Instructeur 2', 'Instructeur 3'];
+    const instructors = [];
+    instructorHeaders.forEach(h => {
+      const idx = headerMap[String(h).trim()];
+      if (idx !== undefined) {
+        const val = rowData[idx];
+        if (val !== undefined && String(val).trim() !== '') {
+          instructors.push(String(val).trim());
+        }
+      }
+    });
+
+    // Build title suffix, appending instructors after a semicolon if any exist
+    let titleSuffix;
+    if (!bookedSeats) {
+      titleSuffix = `${location} (OPTIE - nog geen deelnemers`;
+    } else {
+      titleSuffix = `${location} (${bookedSeats} ${bookedSeats === 1 ? 'deelnemer' : 'deelnemers'}`;
+    }
+    if (instructors.length > 0) {
+      titleSuffix += `; ${instructors.join('+')}`;
+    }
+    titleSuffix += ')';
+
     const title = `Thermoclinic op/bij ${titleSuffix}`;
     const eventDate = new Date(dateValue);
     const calendar = CalendarApp.getCalendarById(TARGET_CALENDAR_ID);
