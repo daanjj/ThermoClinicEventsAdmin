@@ -13,7 +13,9 @@ function onOpen() {
     .addItem('Archiveer doorgestreepte deelnemers', 'archiveStrikethroughParticipants')
     .addSeparator()
     .addItem('Update pop-ups voor alle formulieren', 'updateAllFormDropdowns')
-    .addItem('Controleer en synchroniseer alle agenda-items','checkAndSyncAllCalendarEvents')
+    .addItem('Controleer en synchroniseer alle agenda-items','checkAndSyncAllCalendarEvents')    .addSeparator()
+    .addItem('Gebruikershandleiding', 'showUserGuide')
+
     .addItem('Herstel alle agenda-items (PAS OP!)', 'recreateAllCalendarEvents')
     .addItem('Check of alle permissies zijn toegekend', 'forceAuthorization')
     .addToUi();
