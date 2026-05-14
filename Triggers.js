@@ -7,24 +7,26 @@ function onOpen() {
     .addItem('Verstuur mail naar deelnemers', 'showMailMergeDialog')
     .addItem('Stuur reminder om CORE-app te installeren', 'showCoreReminderDialog')
     .addItem('Lees Excel-bestand in', 'showExcelImportDialog')
-    .addItem('Maak deelnemerslijst', 'showParticipantListDialog') 
+    .addItem('Maak deelnemerslijst', 'showParticipantListDialog')
     .addSeparator()
     .addItem('Archiveer oudere clinics', 'runManualArchive')
     .addItem('Archiveer doorgestreepte deelnemers', 'archiveStrikethroughParticipants')
     .addSeparator()
     .addItem('Update pop-ups voor alle formulieren', 'updateAllFormDropdowns')
-    .addItem('Controleer en synchroniseer alle agenda-items','checkAndSyncAllCalendarEvents')    .addSeparator()
-    .addItem('Gebruikershandleiding', 'showUserGuide')
-
+    .addSeparator()
+    .addItem('Controleer en synchroniseer alle agenda-items', 'checkAndSyncAllCalendarEvents').addSeparator()
     .addItem('Herstel alle agenda-items (PAS OP!)', 'recreateAllCalendarEvents')
+    .addSeparator()
     .addItem('Check of alle permissies zijn toegekend', 'forceAuthorization')
+    .addSeparator()
+    .addItem('Gebruikershandleiding', 'showUserGuide')
     .addToUi();
-  
+
   // Check if the correct Gmail alias is available (indicates correct account)
   try {
     const desiredAlias = EMAIL_SENDER_ALIAS;
     const availableAliases = GmailApp.getAliases();
-    
+
     if (!availableAliases.includes(desiredAlias)) {
       const currentUser = Session.getActiveUser().getEmail() || Session.getEffectiveUser().getEmail() || 'onbekend';
       // Show a one-time warning toast (non-intrusive)
@@ -121,11 +123,11 @@ function autoSortSheet(sheet) {
   const sheetName = sheet.getName();
   const lastRow = sheet.getLastRow();
   const lastCol = sheet.getLastColumn();
-  
+
   // Only sort if there's more than just the header row
   if (lastRow > 1 && lastCol > 0) {
     const dataRange = sheet.getRange(2, 1, lastRow - 1, lastCol);
-    
+
     if (sheetName === DATA_CLINICS_SHEET_NAME) {
       // Data Clinics: sort by column A, then column B (ascending)
       dataRange.sort([
@@ -151,7 +153,7 @@ function autoSortSheet(sheet) {
  */
 function removeBlankRows(sheet) {
   const sheetName = sheet.getName();
-  
+
   // Try to find the table extent from banded ranges (table formatting)
   let lastRow = sheet.getLastRow();
   const bandings = sheet.getBandings();
@@ -164,15 +166,15 @@ function removeBlankRows(sheet) {
       }
     }
   }
-  
+
   if (lastRow <= 1) return; // Nothing to clean
-  
+
   let deletedCount = 0;
-  
+
   // Iterate from bottom to top to avoid index issues when deleting
   for (let row = lastRow; row >= 2; row--) {
     let isBlank = false;
-    
+
     if (sheetName === DATA_CLINICS_SHEET_NAME) {
       // Data Clinics: check columns A through E
       const values = sheet.getRange(row, 1, 1, 5).getValues()[0];
@@ -182,13 +184,13 @@ function removeBlankRows(sheet) {
       const colA = sheet.getRange(row, 1).getValue();
       isBlank = colA === null || colA === undefined || String(colA).trim() === '';
     }
-    
+
     if (isBlank) {
       sheet.deleteRow(row);
       deletedCount++;
     }
   }
-  
+
   if (deletedCount > 0) {
     Logger.log(`Removed ${deletedCount} blank row(s) from sheet "${sheetName}".`);
   }

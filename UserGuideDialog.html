@@ -1,92 +1,107 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <base target="_top">
-    <meta charset="utf-8">
-    <style>
-      body { font-family: Arial, Helvetica, sans-serif; margin: 0; padding: 0; }
-      .container { padding: 18px; box-sizing: border-box; }
-      h1 { margin-top: 0; }
-      .scroll { height: 620px; overflow: auto; padding-right: 10px; }
-      section { margin-bottom: 16px; }
-      pre { background: #f4f4f4; padding: 8px; border-radius: 4px; }
-      .warn { color: #8a0000; font-weight: bold; }
-      ul { margin-top: 6px; }
-      .small { font-size: 0.95em; color: #555; }
-    </style>
-  </head>
-  <body>
-    <div class="container">
-      <h1>Gebruikershandleiding — ThermoClinics</h1>
-      <div class="scroll">
-        <section>
-          <h2>Wat doet dit script?</h2>
-          <p>Dit project automatiseert registratie en communicatie voor ThermoClinics via Google Sheets, Forms, Drive, Calendar en Gmail. Het houdt evenementen bij in het sheet <strong>Data clinics</strong>, maakt per event een Drive-map, beheert deelnemersmappen, synchroniseert Google Agenda en verzorgt mailings.</p>
-        </section>
 
-        <section>
-          <h2>Menu: Thermoclinics Tools</h2>
-          <p>In het spreadsheet vind je het menu <strong>Thermoclinics Tools</strong>. Belangrijke items:</p>
-          <ul>
-            <li><strong>Verstuur mail naar deelnemers</strong> — start de mail merge dialoog om gepersonaliseerde mails te sturen.</li>
-            <li><strong>Stuur reminder om CORE-app te installeren</strong> — stuur herinneringen naar deelnemers die CORE niet geregistreerd hebben.</li>
-            <li><strong>Lees Excel-bestand in voor besloten clinic</strong> — importeer deelnemers vanuit Excel.</li>
-            <li><strong>Maak deelnemerslijst</strong> — genereer een overzichtslijst van deelnemers.</li>
-            <li><strong>Update pop-ups voor alle formulieren</strong> — werk form-keuzelijsten bij op basis van actuele data.</li>
-            <li><strong>Controleer en synchroniseer agenda-items</strong> — voert een veilige controle uit en maakt ontbrekende agenda-items aan of werkt titels/locaties bij als ze afwijken van het sheet.</li>
-            <li><strong>Herstel alle agenda-items</strong> — (INGRIJPEND) hermaakt agenda-items voor álle clinics. Zie de waarschuwing verderop.</li>
-            <li><strong>Check of alle permissies zijn toegekend</strong> — start de autorisatie-check (gebruik bij eerste installatie of bij problemen).</li>
-          </ul>
-        </section>
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <style>
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      margin: 0;
+      padding: 0;
+    }
 
-        <section>
-          <h2>Veelvoorkomende taken</h2>
-          <h3>Mail merge uitvoeren</h3>
-          <ul>
-            <li>Open een incognitovenster en log in met het juiste <strong><jouw-naam@thermoclinics.nl</strong> om verkeerde afzenders te voorkomen.</li>
-            <li>Start <em>Verstuur mail naar deelnemers</em>, kies event en sjabloon, controleer placeholders en verzend.</li>
-          </ul>
+    .container {
+      padding: 18px;
+      box-sizing: border-box;
+    }
 
-          <h3>Agenda controleren (veilige modus)</h3>
-          <p>Gebruik <em>Controleer en synchroniseer agenda-items</em> voor routinecontroles. Dit maakt alleen ontbrekende items aan of werkt titel/locatie bij wanneer deze afwijken. Na afloop zie je een samenvatting met aantallen toegevoegd/gewijzigd.</p>
-        </section>
+    h1 {
+      margin-top: 0;
+    }
 
-        <section>
-          <h2>Waarschuwing: Herstel alle agenda-items</h2>
-          <p class="warn">Let op — deze functie is destructief als je niet voorbereid bent.</p>
-          <p>De optie <em>Herstel alle agenda-items</em> is bedoeld voor volledige resets of migraties naar een andere kalender. Voordat je deze gebruikt:</p>
-          <ol>
-            <li>Maak een backup van je data of zorg dat je oude events handmatig hebt verwijderd uit de bron-kalender.</li>
-            <li>Leeg de kolom <strong>Calendar Event ID</strong> in het sheet <strong>Data clinics</strong> (verwijder alle waarden).</li>
-            <li>Controleer dat de constante <strong>TARGET_CALENDAR_ID</strong> naar de juiste doel-kalender verwijst.</li>
-          </ol>
-          <p>Na uitvoering maakt het script voor elke clinic een nieuw agenda-item aan en schrijft de nieuwe event-ID terug in het sheet. Gebruik alleen als je zeker weet dat je alle bestaande agenda-items wilt vervangen.</p>
-        </section>
+    .scroll {
+      height: 620px;
+      overflow: auto;
+      padding-right: 10px;
+    }
 
-        <section>
-          <h2>Problemen en oplossingen</h2>
-          <h3>Geen menu zichtbaar</h3>
-          <p>Zorg dat je het spreadsheet opnieuw laad of dat je de juiste rechten hebt (script is gebonden aan het sheet). Als het probleem blijft bestaan, open de Script Editor en run <strong>onOpen</strong> handmatig.</p>
+    section {
+      margin-bottom: 16px;
+    }
 
-          <h3>Autorisatie- of scope-fouten</h3>
-          <p>Run <strong>Check of alle permissies zijn toegekend</strong> uit het menu of start <strong>forceAuthorization</strong> in de script editor. Bij mail merge moet je ook ingelogd zijn met het correcte account en de alias beschikbaar hebben.</p>
+    pre {
+      background: #f4f4f4;
+      padding: 8px;
+      border-radius: 4px;
+    }
 
-          </section>
+    .warn {
+      color: #8a0000;
+      font-weight: bold;
+    }
 
-        <section>
-          <h2>Waar vind ik logs en audit info?</h2>
-          <p>Acties en fouten worden naar een centraal logdocument genaamd 'ThermoClinic log' geschreven. Je kunt ook de execution log in de Apps Script Editor gebruiken voor uitvoeringstijd en fouten.</p>
-        </section>
+    ul {
+      margin-top: 6px;
+    }
 
-        <section>
-          <h2>Contact / verder</h2>
-          <p>Voor hulp kun je contact opnemen met daan@thermoclinics.nl. Vermeld altijd de datum van het evenement en eventuele relevante foutmeldingen om sneller geholpen te worden.</p>
-        </section>
-      </div>
-      <div style="margin-top:12px; text-align:right;">
-        <button onclick="google.script.host.close()">Sluiten</button>
-      </div>
+    .small {
+      font-size: 0.95em;
+      color: #555;
+    }
+
+    /* Markdown Alert Styles */
+    .alert {
+      padding: 12px;
+      margin: 16px 0;
+      border-left: 4px solid #ccc;
+      border-radius: 4px;
+      background: #f9f9f9;
+    }
+    .alert-note { border-left-color: #0969da; background-color: #f6f8fa; }
+    .alert-tip { border-left-color: #1a7f37; background-color: #f0fdf4; }
+    .alert-important { border-left-color: #8250df; background-color: #fbefff; }
+    .alert-warning { border-left-color: #9a6700; background-color: #fff8c5; }
+    .alert-caution { border-left-color: #d1242f; background-color: #fff1f0; }
+    .alert strong { text-transform: capitalize; }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <div id="content" class="scroll">
+      <p>Bezig met laden van de handleiding...</p>
     </div>
-    <!-- Static HTML manual; no client-side markdown rendering required -->
-  </body>
+    <div style="margin-top:12px; text-align:right;">
+      <button onclick="google.script.host.close()">Sluiten</button>
+    </div>
+  </div>
+
+  <!-- Load marked.js from CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script>
+    // The markdown content will be injected here by the server-side script
+    const markdownContent = <?!= markdown ?>;
+    
+    window.onload = function() {
+      try {
+        const contentDiv = document.getElementById('content');
+        
+        // Simple pre-processing for GitHub-style alerts
+        const processedMarkdown = markdownContent.replace(
+          /^> \[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]\n> (.*)$/gm,
+          (match, type, content) => {
+            const className = type.toLowerCase();
+            return `<div class="alert alert-${className}"><strong>${type}:</strong> ${content}</div>`;
+          }
+        );
+
+        contentDiv.innerHTML = marked.parse(processedMarkdown);
+      } catch (e) {
+        document.getElementById('content').innerHTML = '<p class="warn">Fout bij het laden van de handleiding: ' + e.message + '</p>';
+      }
+    };
+  </script>
+</body>
+
 </html>
