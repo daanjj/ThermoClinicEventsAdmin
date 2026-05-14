@@ -21,7 +21,22 @@ Bij het openen van het spreadsheet verschijnt er een extra menu genaamd "Thermoc
 * **Lees Excel-bestand in voor besloten clinic:** Start de procedure om deelnemers voor een besloten clinic te importeren vanuit een Excel-bestand.  
 * **Archiveer oudere clinics:** Start handmatig het archiveringsproces. Dit is dezelfde functie die ook elke nacht automatisch draait.  
 * **Update pop-ups voor alle formulieren:** Werkt de keuzelijsten in alle gekoppelde Google Formulieren bij op basis van de actuele data in de Data clinics sheet. Dit gebeurt ook automatisch na elke aanmelding, maar kan handig zijn voor een handmatige synchronisatie.  
+* **Controleer en synchroniseer agenda-items:** Controleert alle clinics in de sheet "ThermoClinic events en inschrijvingen" en maakt ontbrekende agenda-items aan of werkt bestaande items bij (titel/locatie) indien deze afwijken. Geeft na afloop een overzicht van hoeveel items zijn toegevoegd of bijgewerkt. Dit is bedoeld als routinecontrole en is niet destructief.
 * **Check of alle permissies zijn toegekend:** Een functie voor de eerste ingebruikname of bij problemen. Deze functie triggert de autorisatievraag van Google voor alle benodigde services (Drive, Gmail, Calendar, User Info, etc.). Deze check omvat ook de verificatie van de userinfo.email permissie die nodig is voor account verificatie bij mail merge.
+
+#### Opmerking over "Herstel alle agenda-items"
+
+Er bestaat ook een menu-optie **Herstel alle agenda-items**. Gebruik deze alleen wanneer je bewust een volledige reset of migratie van agenda-items wilt uitvoeren. Belangrijke eigenschappen en waarschuwing:
+
+- Deze functie is destructief in de zin dat het ervan uitgaat dat de bestaande agenda-items zijn verwijderd uit de oude kalender en dat de kolom **Calendar Event ID** in de Data clinics sheet is geleegd voordat je begint.
+- De aanbevolen stappen vóór het uitvoeren van deze actie:
+   1. Maak een backup of zorg dat je oude events handmatig hebt verwijderd in de bron-kalender.
+   2. Maak de kolom **Calendar Event ID** in de Data clinics sheet volledig leeg (verwijder alle waarden).
+   3. Controleer of `TARGET_CALENDAR_ID` naar de juiste doel-kalender verwijst.
+- Tijdens uitvoering loopt het script alle clinics af en (her)maakt voor elke rij een nieuw agenda-item in de `TARGET_CALENDAR_ID` en schrijft de nieuwe event-ID terug in de sheet.
+- Gebruik deze functie alleen tijdens migraties of wanneer je zeker weet dat je alle bestaande agenda-items wilt vervangen.
+
+Als je alleen wilt controleren of agenda-items ontbreken of kleine discrepanties wilt repareren (bijv. een onjuiste titel), gebruik dan eerst **Controleer en synchroniseer agenda-items** — deze routine is minder ingrijpend en vraagt geen handmatige voorbereiding.
 
 4. # Automatische Processen
 

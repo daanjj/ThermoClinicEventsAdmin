@@ -49,6 +49,12 @@
 #### Menu Updates
 - Added "Archiveer doorgestreepte deelnemers" menu item in Thermoclinics Tools
 
+#### Menu Additions
+- **Check and synchronize calendar events**: New menu option that scans all clinics in the sheet and creates missing calendar events or updates events whose title/location differ from the sheet. Shows a short summary after completion indicating how many items were added or updated. Intended as a routine, non-destructive check.
+
+#### Warning - Recreate all calendar events
+- **Recreate all calendar events** is a separate, more intrusive function. Use this only when you intend to replace existing calendar events (for example when migrating to a new calendar). The procedure requires that you first clear the `Calendar Event ID` column and manually delete old events. The script will then create new calendar events for all clinics and write the new event IDs back to the sheet.
+
 ---
 
 ## Recent Updates (November 2025)

@@ -11,6 +11,7 @@ The system is built around a central Google Sheet that acts as a database for al
 *   **Automated Registration Processing**: New sign-ups via Google Forms automatically update available slots in the main events sheet.
 *   **Dynamic Form Updates**: Google Form dropdowns for clinic selection are automatically populated and updated based on the events listed in the Google Sheet, ensuring participants can only sign up for active events.
 *   **Calendar Synchronization**: Automatically creates and updates Google Calendar events based on the data in the sheet, including participant counts in the event description.
+*   **Manual Calendar Checks**: From the `Thermoclinics Tools` menu you can now run `Controleer en synchroniseer agenda-items` to perform a non-destructive routine check that creates missing calendar events or updates titles/locations that differ from the sheet. After running it shows a summary of how many events were added or updated.
 *   **Personalized Mail Merge**: A powerful, built-in mail merge feature allows for sending customized bulk emails to participants of a specific clinic. It supports HTML templates, placeholders (like `<Voornaam>`), and attachments. Includes separate confirmation email templates for Open and Besloten clinics.
 *   **CORE App Integration**: Specific functionality to manage communication with participants regarding the CORE Body Temperature Sensor app, including sending reminders to those who haven't registered their app email.
 *   **Participant Data Management**:
@@ -52,6 +53,10 @@ The script is organized into logical modules for maintainability and clarity:
 *   `VersionHistoryRecovery.js`: Comprehensive system for recovering participant data from spreadsheet version history and archives.
 *   `Utils.js`: Contains generic helper functions (like logging, date formatting, and authorization) used across the entire project.
 *   `*.html`: HTML files that define the user interface for custom dialogs (e.g., Mail Merge, Participant Lists).
+
+Note about destructive calendar operation:
+
+* There is also a menu option **Herstel alle agenda-items** which is intended for full resets or migrations. This function assumes you've already removed old events from the source calendar and cleared the `Calendar Event ID` column in the Data clinics sheet. It will (re)create calendar events for every clinic and write the new event IDs back to the sheet — use with caution.
 
 ## Setup & Installation
 
