@@ -14,7 +14,7 @@ function onOpen() {
     .addSeparator()
     .addItem('Update pop-ups voor alle formulieren', 'updateAllFormDropdowns')
     .addSeparator()
-    .addItem('Controleer en synchroniseer alle agenda-items', 'checkAndSyncAllCalendarEvents').addSeparator()
+    .addItem('Controleer en synchroniseer alle agenda-items', 'checkAndSyncAllCalendarEvents')
     .addItem('Herstel alle agenda-items (PAS OP!)', 'recreateAllCalendarEvents')
     .addSeparator()
     .addItem('Check of alle permissies zijn toegekend', 'forceAuthorization')

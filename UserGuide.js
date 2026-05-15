@@ -2,7 +2,7 @@
 function showUserGuide() {
   try {
     // Load the markdown content from the separate file
-    const markdown = HtmlService.createHtmlOutputFromFile('UserGuideContent').getContent();
+    const markdown = HtmlService.createHtmlOutputFromFile('UserGuideContent_markdown').getContent();
     
     // Create the template and pass the markdown content
     const template = HtmlService.createTemplateFromFile('UserGuideDialog');
