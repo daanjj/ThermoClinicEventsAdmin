@@ -65,5 +65,13 @@
     * getClinicsForParticipantList()  
     * generateParticipantTable(selectedClinic)  
     * **Why:** Functions for generating participant reports or lists.
+12. **UserGuide.js**
+    * showUserGuide()
+    * **Why:** Server-side logic for loading the manual content from a separate file and displaying it in a modal dialog.
+13. **UserGuideContent_markdown.html**
+    * Contains the manual text in Markdown format.
+    * **Why:** Decouples content from logic, allowing non-developers to update the documentation easily.
+14. **UserGuideDialog.html**
+    * The UI for the user guide, including the markdown parser (marked.js) and custom styling.
 
     

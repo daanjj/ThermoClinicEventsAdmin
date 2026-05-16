@@ -20,6 +20,7 @@ The system is built around a central Google Sheet that acts as a database for al
     *   Generates on-demand participant lists with key information in a convenient dialog.
 *   **Automated Archiving**: A daily, time-driven trigger automatically archives past events and their corresponding participant responses to keep the active sheets clean and performant. Archived participant data is preserved rather than deleted.
 *   **Version History Recovery**: Comprehensive data recovery system that can extract participant information from spreadsheet version history, with support for batch processing and CSV export.
+*   **Built-in User Guide**: A dynamically rendered user guide available directly from the spreadsheet menu, powered by a separate Markdown content file for easy maintenance.
 *   **Robust Logging**: All major actions, errors, and communications are logged to a central Google Document for easy monitoring and debugging.
 
 ## How It Works
@@ -51,6 +52,8 @@ The script is organized into logical modules for maintainability and clarity:
 *   `ExcelImport.js`: A self-contained feature for importing participant data from Excel files.
 *   `Archiving.js`: Dedicated to the automated archiving process for old clinics with participant data preservation.
 *   `VersionHistoryRecovery.js`: Comprehensive system for recovering participant data from spreadsheet version history and archives.
+*   `UserGuide.js`: Server-side logic for loading the manual content and displaying the user guide dialog.
+*   `UserGuideContent_markdown.html`: Contains the manual text in Markdown format for easy maintenance.
 *   `Utils.js`: Contains generic helper functions (like logging, date formatting, and authorization) used across the entire project.
 *   `*.html`: HTML files that define the user interface for custom dialogs (e.g., Mail Merge, Participant Lists).
 
@@ -72,6 +75,16 @@ Note about destructive calendar operation:
     *   `masterOnFormSubmit` to run from the spreadsheet **On form submit**.
     *   `masterOnEdit` to run from the spreadsheet **On edit**.
     *   `runDailyArchive` to run as a **Time-driven** trigger, daily, at a time of your choosing (e.g., 2-3 am).
+
+## User Guide System
+
+The system includes a built-in user guide accessible via **Thermoclinics Tools** → **Gebruikershandleiding**. 
+
+### How it works:
+1.  **Separated Content**: The actual manual text is stored in `UserGuideContent_markdown.html` as plain Markdown. This allows administrators to update the documentation without touching the logic.
+2.  **Dynamic Rendering**: When the menu item is clicked, `UserGuide.js` loads the content and passes it to the `UserGuideDialog.html` template.
+3.  **Client-Side Parsing**: The dialog uses the `marked.js` library to convert the Markdown into styled HTML on the fly.
+4.  **Advanced Formatting**: The system supports custom GitHub-style alerts (e.g., `> [!CAUTION]`, `> [!NOTE]`) with specific color-coded styling for warnings and important notes.
 
 Once set up, a new "ThermoClinic Menu" will appear in the Google Sheet UI, providing access to the manual features like Mail Merge, Participant Lists, and Archiving.
 

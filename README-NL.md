@@ -19,6 +19,7 @@ Het systeem is gebouwd rond een centraal Google Sheet dat fungeert als de databa
   * Genereert on-demand deelnemerslijsten in een dialoogvenster.
 * **Geautomatiseerde archivering**: Een dagelijkse trigger archiveert oudere events en hun deelnemersgegevens, waarbij archiefgegevens behouden blijven (niet verwijderd).
 * **Version history recovery**: Hulpmiddelen om deelnemersgegevens uit de versiegeschiedenis van het sheet te herstellen en te exporteren naar CSV.
+* **Ingebouwde handleiding**: Een dynamisch gerendeerde gebruikershandleiding, direct beschikbaar vanuit het spreadsheet-menu en eenvoudig te onderhouden via een apart Markdown-bestand.
 * **Robuuste logging**: Belangrijke acties en fouten worden gelogd naar een centraal Google Document voor monitoring en debugging.
 
 ## Werking (kort)
@@ -47,6 +48,8 @@ Het systeem is gebouwd rond een centraal Google Sheet dat fungeert als de databa
 * `ExcelImport.js`: Importeren van deelnemers vanuit Excel.
 * `Archiving.js`: Automatische archivering van oude clinics.
 * `VersionHistoryRecovery.js`: Herstel uit versiegeschiedenis.
+* `UserGuide.js`: Logica voor het laden en weergeven van de gebruikershandleiding.
+* `UserGuideContent_markdown.html`: Bevat de tekst van de handleiding in Markdown-formaat.
 * `Utils.js`: Algemene helpers (logging, datumformattering, autorisatie).
 * `*.html`: HTML-bestanden voor custom dialogen (Mail Merge, Participant Lists, etc.).
 
@@ -63,6 +66,16 @@ Het systeem is gebouwd rond een centraal Google Sheet dat fungeert als de databa
    * `masterOnFormSubmit` → trigger: On form submit
    * `masterOnEdit` → trigger: On edit
    * `runDailyArchive` → tijdgestuurde trigger (dagelijks, bijv. 02:00 - 03:00)
+
+## Gebruikershandleiding Systeem
+
+Het systeem bevat een ingebouwde handleiding via **Thermoclinics Tools** → **Gebruikershandleiding**.
+
+### Hoe het werkt:
+1. **Gescheiden Content**: De eigenlijke handleidingstekst staat in `UserGuideContent_markdown.html` als platte Markdown. Hierdoor kunnen beheerders de tekst aanpassen zonder de scriptlogica te raken.
+2. **Dynamische Weergave**: Bij het klikken op het menu-item laadt `UserGuide.js` de content en geeft deze door aan de template `UserGuideDialog.html`.
+3. **Client-side Parsing**: De dialoog gebruikt de `marked.js` bibliotheek om de Markdown direct om te zetten naar gestylede HTML.
+4. **Geavanceerde Opmaak**: Het systeem ondersteunt custom GitHub-stijl alerts (bijv. `> [!CAUTION]`, `> [!NOTE]`) met specifieke kleuren voor waarschuwingen en belangrijke opmerkingen.
 
 Na installatie verschijnt een menu `Thermoclinics Tools` in het sheet met toegang tot Mail Merge, Deelnemerslijsten, Archivering en overige handmatige functies.
 
