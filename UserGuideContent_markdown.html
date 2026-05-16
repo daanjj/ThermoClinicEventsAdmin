@@ -1,42 +1,56 @@
 # Gebruikershandleiding — ThermoClinics Tools
 
 ## Wat doen deze tools?
-Dit project automatiseert registratie en communicatie voor ThermoClinics via Google Sheets, Forms, Drive, Calendar en Gmail. Het houdt evenementen bij in het sheet **Data clinics**, maakt per event een Drive-map, beheert deelnemersmappen, synchroniseert Google Agenda en verzorgt mailings.
+De ThermoClinic Tools automatiseren registratie en communicatie voor ThermoClinics via Google Sheets, Forms, Drive,
+Calendar en Gmail. Evenementen worden bijgehouden in de sheet **Data clinics**, maakt per event een Drive-map, beheert
+deelnemersmappen, synchroniseert Google Agenda en verzorgt mailings.
 
 ## Menu: Thermoclinics Tools
 In het spreadsheet vind je het menu **Thermoclinics Tools**. Belangrijke items:
 - **Verstuur mail naar deelnemers** — start de mail merge dialoog om gepersonaliseerde mails te sturen.
-- **Stuur reminder om CORE-app te installeren** — stuur herinneringen naar deelnemers die CORE niet geregistreerd hebben.
+- **Stuur reminder om CORE-app te installeren** — stuur herinneringen naar deelnemers die CORE niet geregistreerd
+hebben.
 - **Lees Excel-bestand in voor besloten clinic** — importeer deelnemers vanuit Excel.
 - **Maak deelnemerslijst** — genereer een overzichtslijst van deelnemers.
 - **Update pop-ups voor alle formulieren** — werk form-keuzelijsten bij op basis van actuele data.
-- **Controleer en synchroniseer agenda-items** — voert een veilige controle uit en maakt ontbrekende agenda-items aan of werkt titels/locaties bij als ze afwijken van het sheet.
-- **Herstel alle agenda-items** — (INGRIJPEND) maakt alle agenda-items voor álle clinics opnieuw aan. Zie de waarschuwing verderop.
-- **Check of alle permissies zijn toegekend** — start de autorisatie-check (gebruik bij eerste installatie of bij problemen).
+- **Controleer en synchroniseer agenda-items** — voert een veilige controle uit en maakt ontbrekende agenda-items aan of
+werkt titels/locaties bij als ze afwijken van het sheet.
+- **Herstel alle agenda-items (PAS OP)** — maakt de agenda-items voor álle clinics in de **Data clinics** sheet opnieuw
+aan. Zie de waarschuwing verderop.
+- **Check of alle permissies zijn toegekend** — start de autorisatie-check (gebruik bij eerste installatie of bij
+problemen).
 
 ## Veelvoorkomende taken
 ### Mail merge uitvoeren
-- Open een incognitovenster en log in met het juiste **&lt;jouw-naam&gt;@thermoclinics.nl** om verkeerde afzenders te voorkomen.
+- Open een incognitovenster en log in met het juiste **&lt;jouw-naam&gt;@thermoclinics.nl** om verkeerde afzenders te
+voorkomen.
 - Start *Verstuur mail naar deelnemers*, kies event en sjabloon, controleer placeholders en verzend.
 
 ### Agenda controleren (veilige modus)
-Gebruik *Controleer en synchroniseer agenda-items* voor routinecontroles. Dit maakt alleen ontbrekende items aan of werkt titel/locatie bij wanneer deze afwijken. Na afloop zie je een samenvatting met aantallen toegevoegd/gewijzigd.
+Gebruik *Controleer en synchroniseer agenda-items* voor routinecontroles. Dit maakt alleen ontbrekende items aan of
+werkt titel/locatie bij wanneer deze afwijken. Na afloop zie je een samenvatting met aantallen toegevoegd/gewijzigd.
 
 ## Waarschuwing: Herstel alle agenda-items
 > [!CAUTION]
 > Let op — deze functie is destructief als je niet voorbereid bent.
 
-De optie *Herstel alle agenda-items* is bedoeld voor volledige resets of migraties naar een andere kalender. Na uitvoering maakt het script voor elke clinic een nieuw agenda-item aan en schrijft de nieuwe event-ID terug in het sheet. Gebruik alleen als je zeker weet dat je alle bestaande agenda-items wilt vervangen.
+De optie *Herstel alle agenda-items* is bedoeld voor volledige resets of migraties naar een andere kalender. Na
+uitvoering maakt het script voor elke clinic een nieuw agenda-item aan en schrijft de nieuwe event-ID terug in het
+sheet. Gebruik alleen als je zeker weet dat je alle bestaande agenda-items wilt vervangen.
 
 ## Problemen en oplossingen
 ### Geen menu zichtbaar
-Zorg dat je het spreadsheet opnieuw laadt of dat je de juiste rechten hebt (script is gebonden aan het sheet). Als het probleem blijft bestaan, open de Script Editor en run **onOpen** handmatig.
+Zorg dat je het spreadsheet opnieuw laadt of dat je de juiste rechten hebt (script is gebonden aan het sheet). Als het
+probleem blijft bestaan, open de Script Editor en run **onOpen** handmatig.
 
 ### Autorisatie- of scope-fouten
-Run **Check of alle permissies zijn toegekend** uit het menu of start **forceAuthorization** in de script editor. Bij mail merge moet je ook ingelogd zijn met het correcte account!
+Run **Check of alle permissies zijn toegekend** uit het menu of start **forceAuthorization** in de script editor. Bij
+mail merge moet je ook ingelogd zijn met het correcte account!
 
 ## Waar vind ik logs en audit info?
-Acties en fouten worden naar een centraal logdocument genaamd 'ThermoClinic log' geschreven. Je kunt ook de execution log in de Apps Script Editor gebruiken voor uitvoeringstijd en fouten.
+Acties en fouten worden naar een centraal logdocument genaamd 'ThermoClinic log' geschreven. Je kunt ook de execution
+log in de Apps Script Editor gebruiken voor uitvoeringstijd en fouten.
 
 ## Contact
-Voor hulp kun je contact opnemen met mailto:daan@thermoclinics.nl. Vermeld altijd de datum van het evenement en eventuele relevante foutmeldingen om sneller geholpen te worden.
+Voor hulp kun je contact opnemen met daan@thermoclinics.nl. Vermeld altijd de datum van het evenement en eventuele
+relevante foutmeldingen om sneller geholpen te worden.
