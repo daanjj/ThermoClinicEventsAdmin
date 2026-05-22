@@ -58,6 +58,20 @@ function masterOnEdit(e) {
     switch (sheetName) {
       case DATA_CLINICS_SHEET_NAME:
         Logger.log(`Routing to handleEventChange(), handleClinicTypeChange(), syncCalendarEventFromSheet(), updateAllFormDropdowns(), autoSortSheet(), and removeBlankRows().`);
+        
+        // Protect the header row (A1..K1) of the "Data clinics" sheet
+        if (e && e.range) {
+          const range = e.range;
+          if (range.getRow() === 1 && range.getColumn() <= 11) {
+            const sheet = e.source.getActiveSheet();
+            const correctHeaders = [["Datum", "Tijdstip", "Locatie", "Maximum aantal deelnemers", "Aantal boekingen", "Type", "Instructeur 1", "Instructeur 2", "Instructeur 3", "Calendar Event ID", "Event Folder ID"]];
+            sheet.getRange(1, 1, 1, 11).setValues(correctHeaders);
+            SpreadsheetApp.getUi().alert("Stop! De kopregel is beveiligd. Je wijzigingen zijn automatisch hersteld.");
+            Logger.log("Header edit detected and reverted on Data clinics sheet.");
+            return; // Exit early to prevent downstream event handlers from running on the header row
+          }
+        }
+
         handleEventChange(e); // Handle date, time, and location changes with folder renames
         handleClinicTypeChange(e); // Handle clinic type changes (Open <-> Besloten)
         syncCalendarEventFromSheet(e.range.getRow()); // Sync calendar for any edit (including max seats changes)
