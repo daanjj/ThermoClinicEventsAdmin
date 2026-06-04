@@ -336,7 +336,8 @@ function processBooking(e) {
       if (fromAlias) {
         mailOptions.from = fromAlias;
       }
-      GmailApp.sendEmail(placeholderMap['<Email>'], mergedMail.subject, '', mailOptions);
+      const plainText = compilePlainBody(mergedMail.htmlBody);
+      GmailApp.sendEmail(placeholderMap['<Email>'], mergedMail.subject, plainText, mailOptions);
       
       const templateName = DriveApp.getFileById(templateId).getName();
       logMessage(`${templateType} registratiebevestiging verstuurd aan: ${placeholderMap['<Email>']}, Onderwerp: "${mergedMail.subject}"`);

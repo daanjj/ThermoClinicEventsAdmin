@@ -199,7 +199,8 @@ function sendCoreAppReminder(selectedClinic) {
         if (fromAlias) {
           mailOptions.from = fromAlias;
         }
-        GmailApp.sendEmail(recipientEmail, finalSubject, '', mailOptions);
+        const plainText = compilePlainBody(finalHtml);
+        GmailApp.sendEmail(recipientEmail, finalSubject, plainText, mailOptions);
         sentCount++;
         
         logMessage(`CORE-app Reminder verstuurd aan: ${recipientEmail}, Onderwerp: "${finalSubject}"`);

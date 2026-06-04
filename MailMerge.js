@@ -300,8 +300,8 @@ function performMailMerge(selectedClinic, selectedTemplateId, selectedTemplateNa
             if (fromAlias) {
               mailOptions.from = fromAlias;
             }
-            
-            GmailApp.sendEmail(email, participantSubject, '', mailOptions);
+            const plainText = compilePlainBody(finalHtml);
+            GmailApp.sendEmail(email, participantSubject, plainText, mailOptions);
             sentCount++;
             
             // --- START: Enhanced Logging with Filenames ---
@@ -352,7 +352,8 @@ function performMailMerge(selectedClinic, selectedTemplateId, selectedTemplateNa
           if (fromAlias) {
             mailOptions.from = fromAlias;
           }
-          GmailApp.sendEmail(email, participantSubject, '', mailOptions);
+          const plainText = compilePlainBody(finalHtml);
+          GmailApp.sendEmail(email, participantSubject, plainText, mailOptions);
           sentCount++;
           
           // --- START: Enhanced Logging with Filenames ---

@@ -379,3 +379,24 @@ function getDutchDateString(dateObject) {
 
   return `${dayName} ${dayOfMonth} ${monthName} ${year}`;
 }
+
+/**
+ * Converts HTML body content into a clean plain text fallback by stripping HTML tags.
+ * @param {string} html The HTML content.
+ * @returns {string} The plain text representation.
+ */
+function compilePlainBody(html) {
+  if (!html) return '';
+  let text = html
+    .replace(/<style([\s\S]*?)<\/style>/gi, '') // Remove CSS
+    .replace(/<br\s*\/?>/gi, '\n') // Convert line breaks
+    .replace(/<\/p>/gi, '\n\n') // Convert paragraph ends to double newlines
+    .replace(/<\/div>/gi, '\n') // Convert div ends
+    .replace(/<[^>]+>/g, '') // Strip remaining HTML tags
+    .replace(/&nbsp;/g, ' ') // Decode common HTML entities
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&');
+  
+  return text.split('\n').map(line => line.trim()).join('\n').replace(/\n{3,}/g, '\n\n').trim();
+}
