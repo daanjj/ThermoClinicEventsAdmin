@@ -74,6 +74,18 @@ function prepareMailTemplate(templateId) {
     const gt_from_code = String.fromCharCode(38, 103, 116, 59); // &gt;
     rawHtmlBody = rawHtmlBody.split(lt_from_code).join('<').split(gt_from_code).join('>');
     
+    // Convert bold classes to standard strong tags
+    const boldClassRegex = /\.([a-z0-9_-]+)\s*\{[^}]*font-weight:\s*(?:700|bold)[^}]*\}/g;
+    const boldClasses = [];
+    let match;
+    while ((match = boldClassRegex.exec(exportedHtml)) !== null) {
+      boldClasses.push(match[1]);
+    }
+    boldClasses.forEach(className => {
+      const classRegex = new RegExp(`(<(span|p|h[1-6])[^>]*class=["'][^"']*\\b${className}\\b[^"']*["'][^>]*>)([\\s\\S]*?)(<\\/\\2>)`, 'gi');
+      rawHtmlBody = rawHtmlBody.replace(classRegex, '$1<strong>$3</strong>$4');
+    });
+    
     return { rawHtmlBody, subjectTemplate, senderName };
   } catch (e) {
     Logger.log(`CRITICAL ERROR in prepareMailTemplate (template ID: ${templateId}): ${e.toString()}\n${e.stack}`);
@@ -260,7 +272,7 @@ function performMailMerge(selectedClinic, selectedTemplateId, selectedTemplateNa
             return p;
         }).filter(Boolean);
         const finalBodyContent = finalCleanedElements.join('\n');
-        const finalHtml = `<!DOCTYPE html>...${finalBodyContent}...</html>`; // (Your full HTML boilerplate here)
+        const finalHtml = `<!DOCTYPE html><html lang="nl"><head><meta charset="UTF-8"><title>${participantSubject}</title><style>/* ... your full CSS styles ... */</style></head><body style="background-color: #f4f4f4; margin: 0 !important; padding: 0 !important;"><table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 800px;"><tr><td align="center" style="padding: 20px 0;"><table border="0" cellpadding="0" cellspacing="0" width="100%"><tr><td align="left" bgcolor="#ffffff" style="padding: 25px 40px; font-family: sans-serif; font-size: 16px; color: #333;">${finalBodyContent}</td></tr></table></td></tr></table></body></html>`;
         
         // START INSERTED CODE
 

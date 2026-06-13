@@ -189,7 +189,7 @@ function sendCoreAppReminder(selectedClinic) {
         finalSubject = finalSubject.replace(/\s+([!?.,;:])/g, '$1').replace(/\s+/g, ' ').trim();
         
         // Construct the final HTML (can be simplified if no complex cleaning is needed)
-        const finalHtml = `<!DOCTYPE html>...${finalHtmlBody}...</html>`; // (Your full HTML boilerplate here)
+        const finalHtml = `<!DOCTYPE html><html lang="nl"><head><meta charset="UTF-8"><title>${finalSubject}</title><style>/* ... your full CSS styles ... */</style></head><body style="background-color: #f4f4f4; margin: 0 !important; padding: 0 !important;"><table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 800px;"><tr><td align="center" style="padding: 20px 0;"><table border="0" cellpadding="0" cellspacing="0" width="100%"><tr><td align="left" bgcolor="#ffffff" style="padding: 25px 40px; font-family: sans-serif; font-size: 16px; color: #333;">${finalHtmlBody}</td></tr></table></td></tr></table></body></html>`;
         // =======================================
 
         const mailOptions = {
