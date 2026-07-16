@@ -767,25 +767,44 @@ function populateFormDropdown(formType) {
     const dateTimeOptions = [];
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    for (const rowData of allData) {
+    for (let i = 0; i < allData.length; i++) {
+      const rowData = allData[i];
       const typeValue = rowData[TYPE_COLUMN_INDEX - 1];
+      const rowNum = i + DATA_CLINICS_START_ROW;
+      
       if (String(typeValue).trim().toLowerCase() !== formType.toLowerCase()) continue;
+      
       const dateValue = rowData[DATE_COLUMN_INDEX - 1];
-      if (!dateValue) continue;
+      if (!dateValue) {
+        sheet.getRange(rowNum, 12).setValue('');
+        continue;
+      }
       const eventDate = new Date(dateValue);
-      if (eventDate <= today) continue;
+      if (eventDate <= today) {
+        sheet.getRange(rowNum, 12).setValue('');
+        continue;
+      }
       const maxSeatsRaw = rowData[MAX_SEATS_COLUMN_INDEX - 1];
       const bookedSeatsRaw = rowData[BOOKED_SEATS_COLUMN_INDEX - 1];
       const numMaxSeats = parseInt(maxSeatsRaw, 10);
       const numBookedSeats = (bookedSeatsRaw === '' || bookedSeatsRaw === null) ? 0 : parseInt(bookedSeatsRaw, 10);
-      if (isNaN(numMaxSeats) || numMaxSeats <= 0 || isNaN(numBookedSeats) || numBookedSeats >= numMaxSeats) continue;
+      if (isNaN(numMaxSeats) || numMaxSeats <= 0 || isNaN(numBookedSeats) || numBookedSeats >= numMaxSeats) {
+        sheet.getRange(rowNum, 12).setValue('');
+        continue;
+      }
       const timeText = String(rowData[TIME_COLUMN_INDEX - 1]).trim();
       const locationText = String(rowData[LOCATION_COLUMN_INDEX - 1]).trim();
-      if (!timeText || !locationText) continue;
+      if (!timeText || !locationText) {
+        sheet.getRange(rowNum, 12).setValue('');
+        continue;
+      }
       const availableSeats = numMaxSeats - numBookedSeats;
       const seatsText = availableSeats === 1 ? '1 plaats over' : `${availableSeats} plaatsen over`;
       const combinedOption = `${getDutchDateString(eventDate)} ${timeText}, ${locationText} (${seatsText})`;
       dateTimeOptions.push(combinedOption);
+      
+      // Save the constructed dropdown text to Column L (column 12)
+      sheet.getRange(rowNum, 12).setValue(combinedOption);
     }
     dropdownItem.setChoiceValues(dateTimeOptions.length > 0 ? dateTimeOptions : ['Momenteel zijn er geen beschikbare plaatsen.']);
   } catch (err) {
